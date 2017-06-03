@@ -343,4 +343,9 @@ Float MicrofacetDistribution::Pdf(const Vector3f &wo,
         return D(wh) * AbsCosTheta(wh);
 }
 
+// FlatGaussianElementsDistribution::FlatGaussianElementsDistribution(Float alphax, Float alphay,
+//                                     bool samplevis = true)
+//     : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {
+// }
+
 }  // namespace pbrt

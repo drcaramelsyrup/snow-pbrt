@@ -127,6 +127,24 @@ inline Float TrowbridgeReitzDistribution::RoughnessToAlpha(Float roughness) {
            0.000640711f * x * x * x * x;
 }
 
+// class FlatGaussianElementsDistribution : public MicrofacetDistribution {
+//     public:
+//         // FlatGaussianElementsDistribution Public Methods
+//         static inline Float RoughnessToAlpha(Float roughness);
+//         FlatGaussianElementsDistribution(Float alphax, Float alphay,
+//                                     bool samplevis);
+//         Float D(const Vector3f &wh) const;
+//         Vector3f Sample_wh(const Vector3f &wo, const Point2f &u) const;
+//         std::string ToString() const;
+
+//     private:
+//         // TrowbridgeReitzDistribution Private Methods
+//         Float Lambda(const Vector3f &w) const;
+
+//         // TrowbridgeReitzDistribution Private Data
+//         const Float alphax, alphay;
+// };
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_MICROFACET_H

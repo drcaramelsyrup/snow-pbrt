@@ -114,6 +114,128 @@ int createFlatland(int argc, char *argv[]) {
     return 0;
 }
 
+struct FlatGaussianElement {
+    Vector2f u;
+    Vector2f n;
+
+    Float invCov[4][4];
+};
+
+Float getFlatGaussian2DConstant(Float c, Vector2f s, Float invSigmaRSq) {
+    return c * std::exp(-0.5 * invSigmaRSq * s.LengthSquared());
+}
+
+Float evaluate2DFlatGaussian(Float c, Vector2f mu, Float invCov) {
+    return c * std::exp(-0.5 * (invCov * mu.LengthSquared()));
+}
+Float evaluate4DFlatGaussian(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq) {
+    return c * std::exp(-0.5 * (invSigmaHSq * u.LengthSquared() + invSigmaRSq * s.LengthSquared()));
+}
+
+Float getFlatGaussianProductCov(Float invSigmaHSq, Float invFootprintCov) {
+    return 1.f / (invSigmaHSq + invFootprintCov);
+}
+
+Float getFlatGaussianProductMean(Float finalCov, Float invCov1, Float invCov2, Vector2f mu1, Vector2f mu2) {
+    return finalCov * (invCov1 * mu1 + invCov2 * mu2);
+}
+
+Float getFlatGaussianProductScalingCoeff(Vector2f finalMu, Float c1, Float c2, Float invCov1, Float invCov2) {
+    return evaluate2DFlatGaussian(c1, finalMu, invCov1) * evaluate2DFlatGaussian(c2, finalMu, invCov2);
+}
+
+Float evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq,
+                        Vector2f footprintMean, Float invFootprintCov) {
+
+    Vector2f u0(0,0);   // Flat Gaussian has a diagonal matrix for invCov
+    Float c1 = getFlatGaussian2DConstant(c, s, invSigmaRSq);
+    Float c2 = 1.f / (2 * PI * (1.f / invFootprintCov));    // normalizing the integration
+    Float finalCov = getFlatGaussianProductCov(invSigmaHSq, invFootprintCov);
+    Float finalMu = getFlatGaussianProductMean(finalCov, invSigmaHSq, invFootprintCov, u0, footprintMean);
+    Float finalC = getFlatGaussianProductScalingCoeff(finalMu, c1, c2, invSigmaHSq, invFootprintCov);
+    // Integration over combined, final Gaussian
+    return finalC * 2 * PI * finalCov; // sqrt(norm of final cov matrix)
+}
+
+int create4DPNDF() {
+    const char *outFilename = "4DFlatApproximation.exr";
+
+    Float sigmaR = 0.01f;
+    Point2i outputDim(256,256);
+    int i;
+    for (i = 0; i < argc; ++i) {
+        if (argv[i][0] != '-') break;
+        if (!strcmp(argv[i], "--outputdim")) {
+            ++i;
+            outputDim.x = atoi(argv[i]);
+            ++i;
+            outputDim.y = atoi(argv[i]);
+        } else if (!strcmp(argv[i], "--sigmar")) {
+            ++i;
+            sigmaR = atof(argv[i]);
+        }
+    }
+
+    std::unique_ptr<RGBSpectrum[]> outputImage(new RGBSpectrum[outputDim.x*outputDim.y]);
+
+    // u v normal map
+    // 4D Gaussians, Gaussians on each dimension
+    int m = 80; // number of Gaussians per dimension, determined by texile size
+    FlatGaussianElement* gaussians = new FlatGaussianElement[m*m];  // square distribution
+    Float h = 1.f / m;  // step size
+    Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
+    Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
+    Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
+
+
+
+    // Float invCov[4][4];
+    // invCov[0][0] = 
+    // Matrix4x4 invCov(invSigmaHSq, Float t01, Float t02, Float t03, 
+    //                  Float t10, invSigmaHSq, Float t12, Float t13, 
+    //                  Float t20, Float t21, invSigmaRSq, Float t23, 
+    //                  Float t30, Float t31, Float t32, invSigmaRSq);
+
+    // Sample for m*m Gaussians
+    for (int i = 0; i < m; ++i) {
+        Float x = i*h;
+        Float y = flatlandNormal(x);
+        gaussians[i].u = x;
+        gaussians[i].n = y;
+    }
+
+    // Row major order
+    for (int y = 0; y < outputDim.y; ++y) {
+        for (int x = 0; x < outputDim.x; ++x) {
+            Float sum = 0;
+            // Sum over the relevant Gaussians
+            for (int i = 0; i < m; ++i) {
+
+
+                Vector2f u = ((Float)x) / outputDim.x - seed.u;
+                Vector2f s = ((Float)y) / outputDim.y - seed.n;
+                Float duSquared = std::pow(u - gaussians[i].u, 2);
+
+                
+                Float positionBand = std::exp(-duSquared / (2 * sigmaH * sigmaH));
+                Float dsSquared = std::pow(s - gaussians[i].n, 2);
+                Float normalBand = std::exp(-dsSquared / (2 * sigmaR * sigmaR));
+
+                sum += positionBand * normalBand;
+
+            }
+            outputImage.get()[y * outputDim.x + x] = RGBSpectrum(sum);
+        }
+    }
+
+    WriteImage(outFilename, (Float *)outputImage.get(), Bounds2i(Point2i(0, 0), outputDim),
+        outputDim);
+
+    delete[] gaussians;
+
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
     FLAGS_stderrthreshold = 1; // Warning and above.
