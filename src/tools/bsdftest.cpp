@@ -48,11 +48,11 @@ struct FlatlandGaussianElement {
 };
 
 Float flatlandNormal(Float x) {
-    return std::sin(x*15.f) * .15f + std::cos(x*32.f) * .02f;
+    return std::sin(x*10.f) * 0.16f + std::cos(x*30.f) * 0.1f + 0.5;
 }
 
 int createFlatland(int argc, char *argv[]) {
-    const char *outfile = "flatlandFlatApproximation.exr";
+    const char *outFilename = "flatlandFlatApproximation.exr";
 
     Float sigmaR = 0.01f;
     Point2i outputDim(256,256);
@@ -70,7 +70,6 @@ int createFlatland(int argc, char *argv[]) {
         }
     }
 
-    const char *outFilename = argv[i];
     std::unique_ptr<RGBSpectrum[]> outputImage(new RGBSpectrum[outputDim.x*outputDim.y]);
 
     // u v normal map
@@ -87,33 +86,43 @@ int createFlatland(int argc, char *argv[]) {
         gaussians[i].n = y;
     }
 
-    Float sum = 0;
     // Row major order
-    for (int s = 0; s < outputDim.y; ++s) {
-        for (int u = 0; u < outputDim.x; ++u) {
+    for (int y = 0; y < outputDim.y; ++y) {
+        for (int x = 0; x < outputDim.x; ++x) {
+            Float sum = 0;
             for (int i = 0; i < m; ++i) {
+                Float u = ((Float)x) / outputDim.x;
+                Float s = ((Float)y) / outputDim.y;
                 Float duSquared = std::pow(u - gaussians[i].u, 2);
+                
                 Float positionBand = std::exp(-duSquared / (2 * sigmaH * sigmaH));
                 Float dsSquared = std::pow(s - gaussians[i].n, 2);
                 Float normalBand = std::exp(-dsSquared / (2 * sigmaR * sigmaR));
 
                 sum += positionBand * normalBand;
+
             }
-            outputImage.get()[s * outputDim.x + u] = RGBSpectrum(sum);
+            outputImage.get()[y * outputDim.x + x] = RGBSpectrum(sum);
         }
     }
 
     WriteImage(outFilename, (Float *)outputImage.get(), Bounds2i(Point2i(0, 0), outputDim),
         outputDim);
+
+    delete[] gaussians;
+
     return 0;
 }
 
 int main(int argc, char* argv[]) {
-    Options opt;
-    pbrtInit(opt);
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_stderrthreshold = 1; // Warning and above.
 
     if (!strcmp(argv[1], "flatland"))
         return createFlatland(argc - 2, argv + 2);
+
+    Options opt;
+    pbrtInit(opt);
 
     // number of monte carlo estimates
     // const int estimates = 1;
