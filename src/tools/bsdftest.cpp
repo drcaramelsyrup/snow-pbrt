@@ -9,6 +9,8 @@
 #include "memory.h"
 #include "api.h"
 #include "paramset.h"
+#include "fileutil.h"
+#include "imageio.h"
 #include "shapes/disk.h"
 
 using namespace pbrt;
@@ -40,9 +42,78 @@ void Gen_CosHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi, Float* pdf,
 void Gen_UniformHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi,
                            Float* pdf, Spectrum* f);
 
+struct FlatlandGaussianElement {
+    Float u;
+    Float n;
+};
+
+Float flatlandNormal(Float x) {
+    return std::sin(x*15.f) * .15f + std::cos(x*32.f) * .02f;
+}
+
+int createFlatland(int argc, char *argv[]) {
+    const char *outfile = "flatlandFlatApproximation.exr";
+
+    Float sigmaR = 0.01f;
+    Point2i outputDim(256,256);
+    int i;
+    for (i = 0; i < argc; ++i) {
+        if (argv[i][0] != '-') break;
+        if (!strcmp(argv[i], "--outputdim")) {
+            ++i;
+            outputDim.x = atoi(argv[i]);
+            ++i;
+            outputDim.y = atoi(argv[i]);
+        } else if (!strcmp(argv[i], "--sigmar")) {
+            ++i;
+            sigmaR = atof(argv[i]);
+        }
+    }
+
+    const char *outFilename = argv[i];
+    std::unique_ptr<RGBSpectrum[]> outputImage(new RGBSpectrum[outputDim.x*outputDim.y]);
+
+    // u v normal map
+    // Flatland
+    int m = 80; // number of Gaussians
+    FlatlandGaussianElement* gaussians = new FlatlandGaussianElement[m];
+    Float h = 1.f / m;  // step size
+    Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds, as determined by paper
+
+    for (int i = 0; i < m; ++i) {
+        Float x = i*h;
+        Float y = flatlandNormal(x);
+        gaussians[i].u = x;
+        gaussians[i].n = y;
+    }
+
+    Float sum = 0;
+    // Row major order
+    for (int s = 0; s < outputDim.y; ++s) {
+        for (int u = 0; u < outputDim.x; ++u) {
+            for (int i = 0; i < m; ++i) {
+                Float duSquared = std::pow(u - gaussians[i].u, 2);
+                Float positionBand = std::exp(-duSquared / (2 * sigmaH * sigmaH));
+                Float dsSquared = std::pow(s - gaussians[i].n, 2);
+                Float normalBand = std::exp(-dsSquared / (2 * sigmaR * sigmaR));
+
+                sum += positionBand * normalBand;
+            }
+            outputImage.get()[s * outputDim.x + u] = RGBSpectrum(sum);
+        }
+    }
+
+    WriteImage(outFilename, (Float *)outputImage.get(), Bounds2i(Point2i(0, 0), outputDim),
+        outputDim);
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     Options opt;
     pbrtInit(opt);
+
+    if (!strcmp(argv[1], "flatland"))
+        return createFlatland(argc - 2, argv + 2);
 
     // number of monte carlo estimates
     // const int estimates = 1;
@@ -437,3 +508,5 @@ void createOrenNayar20(BSDF* bsdf) {
     BxDF* bxdf = ARENA_ALLOC(arena, OrenNayar)(Kd, sigma);
     bsdf->Add(bxdf);
 }
+
+
