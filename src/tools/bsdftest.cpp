@@ -134,8 +134,8 @@ Float getFlatGaussian2DConstant(Float c, Vector2f s, Float invSigmaRSq) {
     return c * std::exp(-0.5 * invSigmaRSq * s.LengthSquared());
 }
 
-Float evaluate2DFlatGaussian(Float c, Vector2f mu, Float invCov) {
-    return c * std::exp(-0.5 * (invCov * mu.LengthSquared()));
+Float evaluate2DFlatGaussian(Float c, Vector2f u, Vector2f u0, Float invCov) {
+    return c * std::exp(-0.5 * (invCov * (u - u0).LengthSquared()));
 }
 Float evaluate4DFlatGaussian(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq) {
     return c * std::exp(-0.5 * (invSigmaHSq * u.LengthSquared() + invSigmaRSq * s.LengthSquared()));
@@ -149,8 +149,9 @@ Vector2f getFlatGaussianProductMean(Float finalCov, Float invCov1, Float invCov2
     return finalCov * (invCov1 * mu1 + invCov2 * mu2);
 }
 
-Float getFlatGaussianProductScalingCoeff(Vector2f finalMu, Float c1, Float c2, Float invCov1, Float invCov2) {
-    return evaluate2DFlatGaussian(c1, finalMu, invCov1) * evaluate2DFlatGaussian(c2, finalMu, invCov2);
+Float getFlatGaussianProductScalingCoeff(Vector2f finalMu, Float c1, Float c2, Vector2f mu1, Vector2f mu2, 
+                                        Float invCov1, Float invCov2) {
+    return evaluate2DFlatGaussian(c1, finalMu, mu1, invCov1) * evaluate2DFlatGaussian(c2, finalMu, mu2, invCov2);
 }
 
 Float evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq,
@@ -161,7 +162,7 @@ Float evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float
     Float c2 = 1.f / (2 * Pi * (1.f / invFootprintCov));    // normalizing the integration
     Float finalCov = getFlatGaussianProductCov(invSigmaHSq, invFootprintCov);
     Vector2f finalMu = getFlatGaussianProductMean(finalCov, invSigmaHSq, invFootprintCov, u0, footprintMean);
-    Float finalC = getFlatGaussianProductScalingCoeff(finalMu, c1, c2, invSigmaHSq, invFootprintCov);
+    Float finalC = getFlatGaussianProductScalingCoeff(finalMu, c1, c2, u0, footprintMean, invSigmaHSq, invFootprintCov);
     // Integration over combined, final Gaussian
     return finalC * 2 * Pi * finalCov; // sqrt(norm of final cov matrix)
 }
@@ -174,7 +175,7 @@ Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x
     RGBSpectrum rgb = normalMap[y*size + x];
     Float colors[3];
     rgb.ToRGB(colors);
-    return Vector2f(colors[0] /* r */ / 255.f, colors[1] /* g */ / 255.f) * 2.f - Vector2f(1.f, 1.f);
+    return Vector2f(colors[0] /* r */, colors[1] /* g */) * 2.f - Vector2f(1.f, 1.f);
 }
 
 
@@ -265,8 +266,10 @@ int create4DPNDF(int argc, char* argv[]) {
             int idx = y*res.x + x;
             gaussians[idx].u = Vector2f(x * (1.f / outputDim.x), y * (1.f / outputDim.y));
             gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
+            printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
+
             // when integrating over all samples, we should get one
-            gaussians[idx].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
+            gaussians[idx].c = h*h / ((4*Pi*Pi) * (sigmaH*sigmaH) * (sigmaR*sigmaR));
         }
     }
 
@@ -279,41 +282,63 @@ int create4DPNDF(int argc, char* argv[]) {
     Float invCovFootprint = 1.f / (footprintVar * footprintVar);
     Vector2f footprintCenter = Vector2f(outputDim.x / 2.f, outputDim.y / 2.f);
     Vector2f footprintMean = Vector2f(footprintCenter.x / outputDim.x, footprintCenter.y / outputDim.y);
+    Float maxContribution = 0.f;
+    Float maxSum = 0.f;
+    Vector2i maxSumPixel(0,0);
+    Vector2f maxUV(0, 0);
     // Row major order
     for (int y = 0; y < outputDim.y; ++y) {
         for (int x = 0; x < outputDim.x; ++x) {
             Float sum = 0;
             // Sum over the relevant Gaussians
             // TODO: accelerate by calculating relevant bounds
-            printf("Sampling for (%d, %d): \n", x, y);
+            // printf("Sampling for (%d, %d): \n", x, y);
             for (int sample = 0; sample < nDirectionSamples; ++sample) {
                 // Remapping the st space???
                 Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / outputDim.x), 
                     (y + rng.UniformFloat()) * (1.f / outputDim.y));
                 st = st * 2.f - Vector2f(1.f, 1.f);
+                // printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
+
                 // Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
                 Vector2f uv = Vector2f(((Float)(x)) / outputDim.x, ((Float)(y)) / outputDim.y);
-                printf("    summing values:\n");
-                for (int i = 0; i < m*m; ++i) {
-                    sum += evaluateFlatPNDF(
-                        gaussians[i].c, 
-                        uv - gaussians[i].u, 
-                        st - gaussians[i].n,
+                // printf("    summing values:\n");
+                for (int idx = 0; idx < m*m; ++idx) {
+                    Float contribution = evaluateFlatPNDF(
+                        gaussians[idx].c, 
+                        uv - gaussians[idx].u, 
+                        st - gaussians[idx].n,
                         invSigmaHSq,
                         invSigmaRSq,
-                        footprintMean - gaussians[i].u,
+                        footprintMean - gaussians[idx].u,
                         invCovFootprint
                     );
-                    // printf("%f ", sum);
+                    sum += contribution;
+                    if (contribution > maxContribution) {
+                        maxContribution = contribution;
+                        maxUV = uv;
+                    }
                 }
-                printf("Sample %d finished!\n", sample);
+                // printf("Sample %d finished!\n", sample);
             }
 
             // TODO: additional scaling factor dependent on footprint?
             sum /= (Float)nDirectionSamples;
+            if (sum > 0.f) {
+                printf("Sampling for (%d, %d): ", x, y);
+                printf("%f\n", sum);
+                if (sum > maxSum) {
+                    maxSum = sum;
+                    maxSumPixel = Vector2i(x, y);
+                }
+            }
             outputImage.get()[y * outputDim.x + x] = RGBSpectrum(sum);
         }
+        printf("Max: at uv(%f, %f): %f\n", maxUV.x, maxUV.y, maxContribution);
     }
+
+    printf("OVERALL max: at uv(%f, %f): %f\n", maxUV.x, maxUV.y, maxContribution);
+    printf("OVERALL MAX SUM: at xy(%d, %d): %f\n", maxSumPixel.x, maxSumPixel.y, maxSum);
 
     WriteImage(outFilename, (Float *)outputImage.get(), Bounds2i(Point2i(0, 0), outputDim),
         outputDim);
