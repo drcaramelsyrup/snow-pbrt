@@ -166,10 +166,44 @@ Float evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float
     return finalC * 2 * Pi * finalCov; // sqrt(norm of final cov matrix)
 }
 
+Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y) {
+    // bilinear interpolation
+    // Assuming square size
+    x = Clamp(x, 0, size - 1);
+    y = Clamp(y, 0, size - 1);
+    RGBSpectrum rgb = normalMap[y*size + x];
+    Float colors[3];
+    rgb.ToRGB(colors);
+    return Vector2f(colors[0] /* r */ / 255.f, colors[1] /* g */ / 255.f) * 2.f - Vector2f(1.f, 1.f);
+}
+
+
+Vector2f bilerpNormals(Float s, Float t, 
+                        Vector2f v00, Vector2f v01,
+                        Vector2f v10, Vector2f v11) {
+    return (1.f - s)*(1.f - t)*v00 +
+            (1.f - s)*t*v01 +
+            s*(1.f - t)*v10 +
+            s*t*v11;
+}
+
+Vector2f interpNormalFromNormalMap(const RGBSpectrum* normalMap, int size, Vector2f uv) {
+    Vector2f st = uv*size;
+    Vector2i xy = Vector2i(st.x, st.y); // truncated
+    st = st - Vector2f(xy.x, xy.y);   // interp coordinates
+    Vector2f v00 = sampleNormalFromNormalMap(normalMap, size, xy.x, xy.y);
+    Vector2f v01 = sampleNormalFromNormalMap(normalMap, size, xy.x, xy.y + 1);
+    Vector2f v10 = sampleNormalFromNormalMap(normalMap, size, xy.x + 1, xy.y);
+    Vector2f v11 = sampleNormalFromNormalMap(normalMap, size, xy.x + 1, xy.y + 1);
+
+    return bilerpNormals(st.x, st.y, v00, v01, v10, v11);
+}
+
 int create4DPNDF(int argc, char* argv[]) {
+    const char *inFilename = "normals.png";
     const char *outFilename = "4DFlatApproximation.exr";
 
-    Float sigmaR = 0.01f;
+    Float sigmaR = 0.005f;
     Point2i outputDim(256,256);
     int i;
     for (i = 0; i < argc; ++i) {
@@ -183,6 +217,13 @@ int create4DPNDF(int argc, char* argv[]) {
             ++i;
             sigmaR = atof(argv[i]);
         }
+    }
+
+    Point2i res;
+    std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
+    if (!normalMapImage) {
+        fprintf(stderr, "%s: unable to read image\n", inFilename);
+        return 1;
     }
 
     std::unique_ptr<RGBSpectrum[]> outputImage(new RGBSpectrum[outputDim.x*outputDim.y]);
@@ -203,18 +244,30 @@ int create4DPNDF(int argc, char* argv[]) {
     //                  Float t20, Float t21, invSigmaRSq, Float t23, 
     //                  Float t30, Float t31, Float t32, invSigmaRSq);
 
-    // Sample for m*m Gaussian seeds
-    Float nSamples = m*m;
-    for (int i = 0; i < nSamples; ++i) {
-        // uniform sampling for now. TODO: at least stratified? see sampling.h
-        Float x = outputDim.x * rng.UniformFloat();
-        Float y = outputDim.y * rng.UniformFloat();
+    // // Sample for m*m Gaussian seeds
+    // Float nSamples = m*m;
+    // for (int i = 0; i < nSamples; ++i) {
+    //     // uniform sampling for now. TODO: at least stratified? see sampling.h
+    //     Float x = outputDim.x * rng.UniformFloat();
+    //     Float y = outputDim.y * rng.UniformFloat();
 
-        // TODO: sample from Beckmann distribution or Trowbridge
-        gaussians[i].u = Vector2f(x, y);
-        gaussians[i].n = generateUniformRandomNormal();
-        // when integrating over all samples, we should get one
-        gaussians[i].c = 0.5 * h*h * invSigmaHSq * invSigmaRSq;
+    //     // TODO: sample from Beckmann distribution or Trowbridge
+    //     gaussians[i].u = Vector2f(x, y);
+    //     gaussians[i].n = generateUniformRandomNormal();
+    //     // when integrating over all samples, we should get one
+    //     gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
+    // }
+
+    // Sample for m*m normal map
+
+    for (int y = 0; y < res.y; ++y) {
+        for (int x = 0; x < res.x; ++x) {
+            int idx = y*res.x + x;
+            gaussians[idx].u = Vector2f(x * (1.f / outputDim.x), y * (1.f / outputDim.y));
+            gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
+            // when integrating over all samples, we should get one
+            gaussians[idx].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
+        }
     }
 
     // For testing purposes. We'll generate 4 different incident light directions to sample the BRDF
@@ -232,21 +285,30 @@ int create4DPNDF(int argc, char* argv[]) {
             Float sum = 0;
             // Sum over the relevant Gaussians
             // TODO: accelerate by calculating relevant bounds
+            printf("Sampling for (%d, %d): \n", x, y);
             for (int sample = 0; sample < nDirectionSamples; ++sample) {
-                Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
+                // Remapping the st space???
+                Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / outputDim.x), 
+                    (y + rng.UniformFloat()) * (1.f / outputDim.y));
+                st = st * 2.f - Vector2f(1.f, 1.f);
+                // Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
                 Vector2f uv = Vector2f(((Float)(x)) / outputDim.x, ((Float)(y)) / outputDim.y);
-                for (int i = 0; i < nSamples; ++i) {
+                printf("    summing values:\n");
+                for (int i = 0; i < m*m; ++i) {
                     sum += evaluateFlatPNDF(
                         gaussians[i].c, 
                         uv - gaussians[i].u, 
                         st - gaussians[i].n,
                         invSigmaHSq,
                         invSigmaRSq,
-                        footprintMean,
+                        footprintMean - gaussians[i].u,
                         invCovFootprint
                     );
+                    // printf("%f ", sum);
                 }
+                printf("Sample %d finished!\n", sample);
             }
+
             // TODO: additional scaling factor dependent on footprint?
             sum /= (Float)nDirectionSamples;
             outputImage.get()[y * outputDim.x + x] = RGBSpectrum(sum);
