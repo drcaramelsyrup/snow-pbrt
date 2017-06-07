@@ -41,8 +41,10 @@
 // core/microfacet.h*
 #include "pbrt.h"
 #include "geometry.h"
+#include "materials/snow.h"
 
 namespace pbrt {
+
 
 // MicrofacetDistribution Declarations
 class MicrofacetDistribution {
@@ -127,23 +129,35 @@ inline Float TrowbridgeReitzDistribution::RoughnessToAlpha(Float roughness) {
            0.000640711f * x * x * x * x;
 }
 
-// class FlatGaussianElementsDistribution : public MicrofacetDistribution {
-//     public:
-//         // FlatGaussianElementsDistribution Public Methods
-//         static inline Float RoughnessToAlpha(Float roughness);
-//         FlatGaussianElementsDistribution(Float alphax, Float alphay,
-//                                     bool samplevis);
-//         Float D(const Vector3f &wh) const;
-//         Vector3f Sample_wh(const Vector3f &wo, const Point2f &u) const;
-//         std::string ToString() const;
+class FlatGaussianElementsDistribution : public MicrofacetDistribution {
+     public:
+         // FlatGaussianElementsDistribution Public Methods
+         static inline Float RoughnessToAlpha(Float roughness);
+         FlatGaussianElementsDistribution(Float alphax, Float alphay, Float u, Float v, FlatGaussianElement* gaussians, Point2i res,
+                                     bool samplevis = true)
+			 : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {
+			 this->u = u;
+			 this->v = v;
+			 this->gaussians = gaussians;
+			 this->res = res;
+		 }
+         Float D(const Vector3f &wh) const;
+         Vector3f Sample_wh(const Vector3f &wo, const Point2f &u) const;
+         std::string ToString() const;
 
-//     private:
-//         // TrowbridgeReitzDistribution Private Methods
-//         Float Lambda(const Vector3f &w) const;
+     private:
+         // FlatGaussianElementsDistribution Private Methods
+         Float Lambda(const Vector3f &w) const;
 
-//         // TrowbridgeReitzDistribution Private Data
-//         const Float alphax, alphay;
-// };
+
+         // FlatGaussianElementsDistribution Private Data
+         const Float alphax, alphay;
+
+		 FlatGaussianElement* gaussians;
+		 Float u;
+		 Float v;
+		 Point2i res;
+};
 
 }  // namespace pbrt
 

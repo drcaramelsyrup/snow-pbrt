@@ -162,6 +162,30 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
     return 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e));
 }
 
+//TODO: Rewrite this
+Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
+	//Float sigmaR = 0.005f;
+	//Float h = 1.f / res.x;  // step size
+	//Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
+	//Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
+	//Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
+	//Float footprintRadius = 0.25;
+	//Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
+	//Float invCovFootprint = 1.f / (footprintVar * footprintVar);
+	//Vector2f footprintCenter = Vector2f(300 / 2.f, 300 / 2.f);
+	//Vector2f footprintMean = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
+	//return evaluateFlatPNDF(
+	//	gaussians[idx].c,
+	//	Vector2f(u,v) - gaussians[idx].u,
+	//	st - gaussians[idx].n,
+	//	invSigmaHSq,
+	//	invSigmaRSq,
+	//	footprintMean - gaussians[idx].u,
+	//	invCovFootprint
+	//);
+	return 0.5f;
+}
+
 Float BeckmannDistribution::Lambda(const Vector3f &w) const {
     Float absTanTheta = std::abs(TanTheta(w));
     if (std::isinf(absTanTheta)) return 0.;
@@ -183,6 +207,17 @@ Float TrowbridgeReitzDistribution::Lambda(const Vector3f &w) const {
     return (-1 + std::sqrt(1.f + alpha2Tan2Theta)) / 2;
 }
 
+//TODO: Rewrite this
+Float FlatGaussianElementsDistribution::Lambda(const Vector3f &w) const {
+	Float absTanTheta = std::abs(TanTheta(w));
+	if (std::isinf(absTanTheta)) return 0.;
+	// Compute _alpha_ for direction _w_
+	Float alpha =
+		std::sqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
+	Float alpha2Tan2Theta = (alpha * absTanTheta) * (alpha * absTanTheta);
+	return (-1 + std::sqrt(1.f + alpha2Tan2Theta)) / 2;
+}
+
 std::string BeckmannDistribution::ToString() const {
     return StringPrintf("[ BeckmannDistribution alphax: %f alphay: %f ]",
                         alphax, alphay);
@@ -191,6 +226,11 @@ std::string BeckmannDistribution::ToString() const {
 std::string TrowbridgeReitzDistribution::ToString() const {
     return StringPrintf("[ TrowbridgeReitzDistribution alphax: %f alphay: %f ]",
                         alphax, alphay);
+}
+
+std::string FlatGaussianElementsDistribution::ToString() const {
+	return StringPrintf("[ FlatGaussianElementsDistribution alphax: %f alphay: %f ]",
+		alphax, alphay);
 }
 
 Vector3f BeckmannDistribution::Sample_wh(const Vector3f &wo,
@@ -333,6 +373,40 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
         if (flip) wh = -wh;
     }
     return wh;
+}
+
+//TODO: Rewrite this
+Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
+	const Point2f &u) const {
+	Vector3f wh;
+	if (!sampleVisibleArea) {
+		Float cosTheta = 0, phi = (2 * Pi) * u[1];
+		if (alphax == alphay) {
+			Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
+			cosTheta = 1 / std::sqrt(1 + tanTheta2);
+		}
+		else {
+			phi =
+				std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
+			if (u[1] > .5f) phi += Pi;
+			Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
+			const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
+			const Float alpha2 =
+				1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
+			Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
+			cosTheta = 1 / std::sqrt(1 + tanTheta2);
+		}
+		Float sinTheta =
+			std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
+		wh = SphericalDirection(sinTheta, cosTheta, phi);
+		if (!SameHemisphere(wo, wh)) wh = -wh;
+	}
+	else {
+		bool flip = wo.z < 0;
+		wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
+		if (flip) wh = -wh;
+	}
+	return wh;
 }
 
 Float MicrofacetDistribution::Pdf(const Vector3f &wo,

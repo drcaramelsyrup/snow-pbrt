@@ -41,8 +41,26 @@
 // materials/snow.h*
 #include "pbrt.h"
 #include "material.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+
+
+#include "paramset.h"
+#include "fileutil.h"
+#include "imageio.h"
+#include "geometry.h"
+
 
 namespace pbrt {
+
+struct FlatGaussianElement {
+	Vector2f u;
+	Vector2f n;
+	Float c;
+
+		//  Float invCov[4][4];
+};
 
 // SnowMaterial Declarations
 class SnowMaterial : public Material {
@@ -61,7 +79,9 @@ class SnowMaterial : public Material {
           vRoughness(vRoughness),
           index(index),
           bumpMap(bumpMap),
-          remapRoughness(remapRoughness) {}
+		remapRoughness(remapRoughness) {
+		gaussians = ComputeGaussianMixture();
+	}
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode,
                                     bool allowMultipleLobes) const;
@@ -73,6 +93,11 @@ class SnowMaterial : public Material {
     std::shared_ptr<Texture<Float>> index;
     std::shared_ptr<Texture<Float>> bumpMap;
     bool remapRoughness;
+	FlatGaussianElement* gaussians;
+	Point2i normalRes;
+	
+	FlatGaussianElement*  ComputeGaussianMixture();
+	Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y);
 };
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp);
