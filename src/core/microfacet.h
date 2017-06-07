@@ -143,7 +143,13 @@ class FlatGaussianElementsDistribution : public MicrofacetDistribution {
 		 }
          Float D(const Vector3f &wh) const;
          Vector3f Sample_wh(const Vector3f &wo, const Point2f &u) const;
-         std::string ToString() const;
+		 Float getFlatGaussian2DConstant(Float c, Vector2f s, Float invSigmaRSq) const;
+		 Float evaluate2DFlatGaussian(Float c, Vector2f u, Vector2f u0, Float invCov) const;
+		 Float getFlatGaussianProductCov(Float invSigmaHSq, Float invFootprintCov) const;
+		 Vector2f getFlatGaussianProductMean(Float finalCov, Float invCov1, Float invCov2, Vector2f mu1, Vector2f mu2) const;
+		 Float getFlatGaussianProductScalingCoeff(Vector2f finalMu, Float c1, Float c2, Vector2f mu1, Vector2f mu2, Float invCov1, Float invCov2) const;
+		 Float evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq, Vector2f footprintMean, Float invFootprintCov) const;
+		 std::string ToString() const;
 
      private:
          // FlatGaussianElementsDistribution Private Methods

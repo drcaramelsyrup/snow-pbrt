@@ -33,9 +33,11 @@
 // core/microfacet.cpp*
 #include "microfacet.h"
 #include "reflection.h"
+#include "rng.h"
 
 namespace pbrt {
 
+static RNG rng;
 // Microfacet Utility Functions
 static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
                              Float *slope_x, Float *slope_y) {
@@ -164,26 +166,53 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
 
 //TODO: Rewrite this
 Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
-	//Float sigmaR = 0.005f;
-	//Float h = 1.f / res.x;  // step size
-	//Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
-	//Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
-	//Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
-	//Float footprintRadius = 0.25;
-	//Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
-	//Float invCovFootprint = 1.f / (footprintVar * footprintVar);
-	//Vector2f footprintCenter = Vector2f(300 / 2.f, 300 / 2.f);
-	//Vector2f footprintMean = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
-	//return evaluateFlatPNDF(
-	//	gaussians[idx].c,
-	//	Vector2f(u,v) - gaussians[idx].u,
-	//	st - gaussians[idx].n,
-	//	invSigmaHSq,
-	//	invSigmaRSq,
-	//	footprintMean - gaussians[idx].u,
-	//	invCovFootprint
-	//);
-	return 0.5f;
+	Float sigmaR = 0.005f;
+	Float h = 1.f / res.x;  // step size
+	Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
+	Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
+	Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
+	Float footprintRadius = 0.25;
+	Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
+	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
+	Vector2f footprintCenter = Vector2f(300 / 2.f, 300 / 2.f);
+	Vector2f footprintMean = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
+
+	int nDirectionSamples = 4;
+	Float sum = 0;
+	float x = u * res.x;
+	float y = v *res.y;
+	// Sum over the relevant Gaussians
+	// TODO: accelerate by calculating relevant bounds
+	// printf("Sampling for (%d, %d): \n", x, y);
+	for (int sample = 0; sample < nDirectionSamples; ++sample) {
+		// Remapping the st space???
+		Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / res.x),
+			(y + rng.UniformFloat()) * (1.f / res.y));
+		st = st * 2.f - Vector2f(1.f, 1.f);
+		// printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
+
+		// Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
+		Vector2f uv = Vector2f(u,v);
+		// printf("    summing values:\n");
+		for (int idx = 0; idx < res.x*res.y; ++idx) {
+			Float contribution = evaluateFlatPNDF(
+				gaussians[idx].c,
+				uv - gaussians[idx].u,
+				st - gaussians[idx].n,
+				invSigmaHSq,
+				invSigmaRSq,
+				footprintMean - gaussians[idx].u,
+				invCovFootprint
+			);
+			sum += contribution;
+		}
+		// printf("Sample %d finished!\n", sample);
+	}
+
+	// TODO: additional scaling factor dependent on footprint?
+	sum /= (Float)nDirectionSamples;
+	
+	return sum;
 }
 
 Float BeckmannDistribution::Lambda(const Vector3f &w) const {
@@ -409,6 +438,40 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
 	return wh;
 }
 
+Float FlatGaussianElementsDistribution::getFlatGaussian2DConstant(Float c, Vector2f s, Float invSigmaRSq) const {
+	return c * std::exp(-0.5 * invSigmaRSq * s.LengthSquared());
+}
+
+Float FlatGaussianElementsDistribution::evaluate2DFlatGaussian(Float c, Vector2f u, Vector2f u0, Float invCov) const{
+	return c * std::exp(-0.5 * (invCov * (u - u0).LengthSquared()));
+}
+
+Float FlatGaussianElementsDistribution::getFlatGaussianProductCov(Float invSigmaHSq, Float invFootprintCov) const{
+	return 1.f / (invSigmaHSq + invFootprintCov);
+}
+
+Vector2f FlatGaussianElementsDistribution::getFlatGaussianProductMean(Float finalCov, Float invCov1, Float invCov2, Vector2f mu1, Vector2f mu2) const{
+	return finalCov * (invCov1 * mu1 + invCov2 * mu2);
+}
+
+Float FlatGaussianElementsDistribution::getFlatGaussianProductScalingCoeff(Vector2f finalMu, Float c1, Float c2, Vector2f mu1, Vector2f mu2,
+	Float invCov1, Float invCov2) const{
+	return evaluate2DFlatGaussian(c1, finalMu, mu1, invCov1) * evaluate2DFlatGaussian(c2, finalMu, mu2, invCov2);
+}
+
+Float FlatGaussianElementsDistribution::evaluateFlatPNDF(Float c, Vector2f u, Vector2f s, Float invSigmaHSq, Float invSigmaRSq,
+	Vector2f footprintMean, Float invFootprintCov) const{
+
+	Vector2f u0(0, 0);   // Flat Gaussian has a diagonal matrix for invCov
+	Float c1 = getFlatGaussian2DConstant(c, s, invSigmaRSq);
+	Float c2 = 1.f / (2 * Pi * (1.f / invFootprintCov));    // normalizing the integration
+	Float finalCov = getFlatGaussianProductCov(invSigmaHSq, invFootprintCov);
+	Vector2f finalMu = getFlatGaussianProductMean(finalCov, invSigmaHSq, invFootprintCov, u0, footprintMean);
+	Float finalC = getFlatGaussianProductScalingCoeff(finalMu, c1, c2, u0, footprintMean, invSigmaHSq, invFootprintCov);
+	// Integration over combined, final Gaussian
+	return finalC * 2 * Pi * finalCov; // sqrt(norm of final cov matrix)
+}
+
 Float MicrofacetDistribution::Pdf(const Vector3f &wo,
                                   const Vector3f &wh) const {
     if (sampleVisibleArea)
@@ -416,6 +479,8 @@ Float MicrofacetDistribution::Pdf(const Vector3f &wo,
     else
         return D(wh) * AbsCosTheta(wh);
 }
+
+
 
 // FlatGaussianElementsDistribution::FlatGaussianElementsDistribution(Float alphax, Float alphay,
 //                                     bool samplevis = true)

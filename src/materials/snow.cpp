@@ -72,8 +72,8 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         }
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
-                       : ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(
-                             urough, vrough);
+                       : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
+                             urough, vrough, si->uv[0], si->uv[1], gaussians, normalRes);
         if (!R.IsBlack()) {
             Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
             if (isSpecular)
@@ -94,7 +94,7 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
 }
 
-FlatGaussianElement*  SnowMaterial::ComputeGaussianMixture()
+FlatGaussianElement* SnowMaterial::ComputeGaussianMixture()
 {
 	const char *inFilename = "normals.png";
 
@@ -126,7 +126,7 @@ FlatGaussianElement*  SnowMaterial::ComputeGaussianMixture()
 			int idx = y*res.x + x;
 			gaussians[idx].u = Vector2f(x * (1.f / outputDim.x), y * (1.f / outputDim.y));
 			gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
-			printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
+		//	printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
 
 			// when integrating over all samples, we should get one
 			gaussians[idx].c = h*h / ((4 * Pi*Pi) * (sigmaH*sigmaH) * (sigmaR*sigmaR));

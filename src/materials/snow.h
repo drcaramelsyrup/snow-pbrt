@@ -55,12 +55,12 @@
 namespace pbrt {
 
 struct FlatGaussianElement {
-	Vector2f u;
-	Vector2f n;
-	Float c;
+		Vector2f u;
+		Vector2f n;
+		Float c;
 
 		//  Float invCov[4][4];
-};
+	};
 
 // SnowMaterial Declarations
 class SnowMaterial : public Material {
