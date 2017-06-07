@@ -232,7 +232,7 @@ int create4DPNDF(int argc, char* argv[]) {
     // u v normal map
     // 4D Gaussians, Gaussians on each dimension
     int m = outputDim.x; // number of Gaussians per dimension, determined by texile size
-    FlatGaussianElement* gaussians = new FlatGaussianElement[m*m];  // square distribution
+    pbrt::FlatGaussianElement* gaussians = new pbrt::FlatGaussianElement[m*m];  // square distribution
     Float h = 1.f / m;  // step size
     Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
     Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
