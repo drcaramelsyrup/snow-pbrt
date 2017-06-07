@@ -44,23 +44,25 @@
 
 #include "pbrt.h"
 #include "material.h"
-#include "reflection.h"
+
 #include "bssrdf.h"
 #include "geometry.h"
 
+
 namespace pbrt {
 
-struct FlatGaussianElement {
-		Vector2f u;
-		Vector2f n;
-		Float c;
-
-		//  Float invCov[4][4];
-	};
+//struct FlatGaussianElement {
+//		Vector2f u;
+//		Vector2f n;
+//		Float c;
+//
+//		//  Float invCov[4][4];
+//	};
 
 // SnowMaterial Declarations
 class SnowMaterial : public Material {
   public:
+	  
     // SnowMaterial Public Methods
     SnowMaterial(Float scale,
                   const std::shared_ptr<Texture<Spectrum>> &Kr,
@@ -99,13 +101,13 @@ class SnowMaterial : public Material {
     std::shared_ptr<Texture<Float>> bumpMap;
     const Float eta;
     bool remapRoughness;
-
+	BSSRDFTable table;
 	FlatGaussianElement* gaussians;
 	Point2i normalRes;
 	
 	FlatGaussianElement*  ComputeGaussianMixture();
 	Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y);
-	BSSRDFTable table;
+
 
 };
 

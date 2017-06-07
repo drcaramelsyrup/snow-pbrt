@@ -41,10 +41,17 @@
 // core/microfacet.h*
 #include "pbrt.h"
 #include "geometry.h"
-#include "materials/snow.h"
+
 
 namespace pbrt {
 
+	struct FlatGaussianElement {
+		Vector2f u;
+		Vector2f n;
+		Float c;
+
+		//  Float invCov[4][4];
+	};
 
 // MicrofacetDistribution Declarations
 class MicrofacetDistribution {
