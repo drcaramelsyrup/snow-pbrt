@@ -99,6 +99,7 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 }
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
+    // g should be 0.93?
     Float sig_a_rgb[3] = {0.00022272, 0.00025513, 0.000271},
       sig_s_rgb[3] = {0.012638, 0.031051, 0.050124};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
