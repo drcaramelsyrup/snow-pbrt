@@ -155,6 +155,7 @@ Vector2f SnowMaterial::sampleNormalFromNormalMap(const RGBSpectrum* normalMap, i
 }
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
+    // g should be 0.93?
     Float sig_a_rgb[3] = {0.00022272, 0.00025513, 0.000271},
       sig_s_rgb[3] = {0.012638, 0.031051, 0.050124};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
@@ -164,7 +165,7 @@ SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
 
     Float scale = mp.FindFloat("scale", 1.f);
     Float eta = mp.FindFloat("eta", 1.33f);
-    
+
     std::shared_ptr<Texture<Spectrum>> sigma_a, sigma_s;
     sigma_a = mp.GetSpectrumTexture("sigma_a", sig_a);
     sigma_s = mp.GetSpectrumTexture("sigma_s", sig_s);
