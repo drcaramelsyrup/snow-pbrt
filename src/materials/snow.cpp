@@ -51,11 +51,13 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                bool allowMultipleLobes) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
-    Float eta = index->Evaluate(*si);
-    Float urough = uRoughness->Evaluate(*si);
-    Float vrough = vRoughness->Evaluate(*si);
+
+    // Initialize BSDF for _SnowMaterial_
     Spectrum R = Kr->Evaluate(*si).Clamp();
     Spectrum T = Kt->Evaluate(*si).Clamp();
+    Float urough = uRoughness->Evaluate(*si);
+    Float vrough = vRoughness->Evaluate(*si);
+
     // Initialize _bsdf_ for smooth or rough dielectric
     si->bsdf = ARENA_ALLOC(arena, BSDF)(*si, eta);
 
@@ -92,6 +94,11 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                     T, distrib, 1.f, eta, mode));
         }
     }
+
+    Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
+    Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
+    si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
+                                                     sig_a, sig_s, table);
 }
 
 FlatGaussianElement* SnowMaterial::ComputeGaussianMixture()
@@ -148,12 +155,23 @@ Vector2f SnowMaterial::sampleNormalFromNormalMap(const RGBSpectrum* normalMap, i
 }
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
+    Float sig_a_rgb[3] = {0.00022272, 0.00025513, 0.000271},
+      sig_s_rgb[3] = {0.012638, 0.031051, 0.050124};
+    Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
+             sig_s = Spectrum::FromRGB(sig_s_rgb);
+
+    Float g = mp.FindFloat("g", 0.0f);
+
+    Float scale = mp.FindFloat("scale", 1.f);
+    Float eta = mp.FindFloat("eta", 1.33f);
+    
+    std::shared_ptr<Texture<Spectrum>> sigma_a, sigma_s;
+    sigma_a = mp.GetSpectrumTexture("sigma_a", sig_a);
+    sigma_s = mp.GetSpectrumTexture("sigma_s", sig_s);
     std::shared_ptr<Texture<Spectrum>> Kr =
         mp.GetSpectrumTexture("Kr", Spectrum(1.f));
-    std::shared_ptr<Texture<Spectrum>> Kt =
-        mp.GetSpectrumTexture("Kt", Spectrum(0.2f));
-    std::shared_ptr<Texture<Float>> eta = mp.GetFloatTextureOrNull("eta");
-    if (!eta) eta = mp.GetFloatTexture("index", 1.5f);
+    std::shared_ptr<Texture<Spectrum>> Kt = mp.GetSpectrumTexture("Kt", Spectrum(1.f));
+
     std::shared_ptr<Texture<Float>> roughu =
         mp.GetFloatTexture("uroughness", 0.f);
     std::shared_ptr<Texture<Float>> roughv =
@@ -162,8 +180,8 @@ SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
         mp.GetFloatTextureOrNull("bumpmap");
 
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new SnowMaterial(Kr, Kt, roughu, roughv, eta, bumpMap,
-                             remapRoughness);
+    return new SnowMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
+                                  roughu, roughv, bumpMap, remapRoughness);
 }
 
 }  // namespace pbrt
