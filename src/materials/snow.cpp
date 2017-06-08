@@ -163,8 +163,6 @@ Vector2f SnowMaterial::sampleNormalFromNormalMap(const RGBSpectrum* normalMap, i
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
     // g should be 0.93?
     // extinction coefficient is 1.38121547
-    // Float sig_a_rgb[3] = {0.153468386, 0.072695551, 0.001f},
-    //   sig_s_rgb[3] = {1.227747084, 1.308519919, 1.38121547};
     Float sig_a_rgb[3] = {0.153468386, 0.072695551, 0.001f},
         sig_s_rgb[3] = {1.227747084, 1.308519919, 1.38121547};
 
