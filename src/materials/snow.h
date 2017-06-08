@@ -51,6 +51,10 @@
 #include "geometry.h"
 
 
+#include "bssrdf.h"
+#include "geometry.h"
+
+
 namespace pbrt {
 
 // SnowMaterial Declarations
