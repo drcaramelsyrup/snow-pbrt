@@ -39,16 +39,24 @@
 #define PBRT_MATERIALS_SNOW_H
 
 // materials/snow.h*
+
+
+
 #include "pbrt.h"
 #include "material.h"
 #include "reflection.h"
 #include "bssrdf.h"
+
+#include "bssrdf.h"
+#include "geometry.h"
+
 
 namespace pbrt {
 
 // SnowMaterial Declarations
 class SnowMaterial : public Material {
   public:
+	  
     // SnowMaterial Public Methods
     SnowMaterial(Float scale,
                   const std::shared_ptr<Texture<Spectrum>> &Kr,
@@ -72,7 +80,9 @@ class SnowMaterial : public Material {
           remapRoughness(remapRoughness),
           table(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
+		gaussians = ComputeGaussianMixture();
     }
+
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode,
                                     bool allowMultipleLobes) const;
@@ -85,7 +95,14 @@ class SnowMaterial : public Material {
     std::shared_ptr<Texture<Float>> bumpMap;
     const Float eta;
     bool remapRoughness;
-    BSSRDFTable table;
+	BSSRDFTable table;
+	FlatGaussianElement* gaussians;
+	Point2i normalRes;
+	
+	FlatGaussianElement*  ComputeGaussianMixture();
+	Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y);
+
+
 };
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp);

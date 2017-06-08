@@ -121,6 +121,23 @@ Vector2f generateUniformRandomNormal() {
     return Vector2f(hemisphereSample.x, hemisphereSample.y);
 }
 
+Vector2f generateSeedNormals() {
+        // // Sample for m*m Gaussian seeds
+    // Float nSamples = m*m;
+    // for (int i = 0; i < nSamples; ++i) {
+    //     // uniform sampling for now. TODO: at least stratified? see sampling.h
+    //     Float x = outputDim.x * rng.UniformFloat();
+    //     Float y = outputDim.y * rng.UniformFloat();
+
+    //     // TODO: sample from Beckmann distribution or Trowbridge
+    //     gaussians[i].u = Vector2f(x, y);
+    //     gaussians[i].n = generateUniformRandomNormal();
+    //     // when integrating over all samples, we should get one
+    //     gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
+    // }
+    return Vector2f(0,0);
+}
+
 struct FlatGaussianElement {
     Vector2f u;
     Vector2f n;
@@ -232,7 +249,7 @@ int create4DPNDF(int argc, char* argv[]) {
     // u v normal map
     // 4D Gaussians, Gaussians on each dimension
     int m = outputDim.x; // number of Gaussians per dimension, determined by texile size
-    FlatGaussianElement* gaussians = new FlatGaussianElement[m*m];  // square distribution
+    pbrt::FlatGaussianElement* gaussians = new pbrt::FlatGaussianElement[m*m];  // square distribution
     Float h = 1.f / m;  // step size
     Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
     Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
@@ -244,20 +261,6 @@ int create4DPNDF(int argc, char* argv[]) {
     //                  Float t10, invSigmaHSq, Float t12, Float t13, 
     //                  Float t20, Float t21, invSigmaRSq, Float t23, 
     //                  Float t30, Float t31, Float t32, invSigmaRSq);
-
-    // // Sample for m*m Gaussian seeds
-    // Float nSamples = m*m;
-    // for (int i = 0; i < nSamples; ++i) {
-    //     // uniform sampling for now. TODO: at least stratified? see sampling.h
-    //     Float x = outputDim.x * rng.UniformFloat();
-    //     Float y = outputDim.y * rng.UniformFloat();
-
-    //     // TODO: sample from Beckmann distribution or Trowbridge
-    //     gaussians[i].u = Vector2f(x, y);
-    //     gaussians[i].n = generateUniformRandomNormal();
-    //     // when integrating over all samples, we should get one
-    //     gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
-    // }
 
     // Sample for m*m normal map
 
