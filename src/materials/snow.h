@@ -44,20 +44,18 @@
 
 #include "pbrt.h"
 #include "material.h"
+#include "reflection.h"
+#include "bssrdf.h"
+
+#include "bssrdf.h"
+#include "geometry.h"
+
 
 #include "bssrdf.h"
 #include "geometry.h"
 
 
 namespace pbrt {
-
-//struct FlatGaussianElement {
-//		Vector2f u;
-//		Vector2f n;
-//		Float c;
-//
-//		//  Float invCov[4][4];
-//	};
 
 // SnowMaterial Declarations
 class SnowMaterial : public Material {

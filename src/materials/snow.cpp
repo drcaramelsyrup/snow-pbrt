@@ -64,6 +64,7 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
+    isSpecular = false;
     if (isSpecular && allowMultipleLobes) {
         si->bsdf->Add(
             ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
@@ -72,6 +73,11 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
+        // MicrofacetDistribution *distrib =
+        //     isSpecular ? nullptr
+        //                : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
+        //                      urough, vrough, si->uv[0], si->uv[1], gaussians, normalRes);
+
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
                        : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
@@ -156,12 +162,26 @@ Vector2f SnowMaterial::sampleNormalFromNormalMap(const RGBSpectrum* normalMap, i
 
 SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
     // g should be 0.93?
-    Float sig_a_rgb[3] = {0.00022272, 0.00025513, 0.000271},
-      sig_s_rgb[3] = {0.012638, 0.031051, 0.050124};
+    // extinction coefficient is 1.38121547
+    Float sig_a_rgb[3] = {0.153468386, 0.072695551, 0.001f},
+        sig_s_rgb[3] = {1.227747084, 1.308519919, 1.38121547};
+
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
              sig_s = Spectrum::FromRGB(sig_s_rgb);
 
-    Float g = mp.FindFloat("g", 0.0f);
+    Float g = mp.FindFloat("g", -0.93f);
+
+    /*std::string name = "Lowfat Milk";
+    bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
+    if (!found)
+        Warning("Named material \"%s\" not found.  Using defaults.",
+                name.c_str());
+    else
+        g = 0; /* Enforce g=0 (the database specifies reduced scattering
+                  coefficients) */
+
+    printf("Spectrum %f\n", sig_a[0]);
+
 
     Float scale = mp.FindFloat("scale", 1.f);
     Float eta = mp.FindFloat("eta", 1.33f);
@@ -169,6 +189,7 @@ SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> sigma_a, sigma_s;
     sigma_a = mp.GetSpectrumTexture("sigma_a", sig_a);
     sigma_s = mp.GetSpectrumTexture("sigma_s", sig_s);
+
     std::shared_ptr<Texture<Spectrum>> Kr =
         mp.GetSpectrumTexture("Kr", Spectrum(1.f));
     std::shared_ptr<Texture<Spectrum>> Kt = mp.GetSpectrumTexture("Kt", Spectrum(1.f));
