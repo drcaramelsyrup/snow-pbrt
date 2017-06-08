@@ -64,7 +64,7 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
-    isSpecular = false;
+    // isSpecular = false;
     if (isSpecular && allowMultipleLobes) {
         si->bsdf->Add(
             ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
