@@ -55,12 +55,12 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     // Initialize BSDF for _SnowMaterial_
     Spectrum R = Kr->Evaluate(*si).Clamp();
     Spectrum T = Kt->Evaluate(*si).Clamp();
-    Float urough = uRoughness->Evaluate(*si);
-    Float vrough = vRoughness->Evaluate(*si);
+    Float urough = uRoughness->Evaluate(*si) + 0.1;
+    Float vrough = vRoughness->Evaluate(*si) + 0.1;
 
     // Initialize _bsdf_ for smooth or rough dielectric
     si->bsdf = ARENA_ALLOC(arena, BSDF)(*si, eta);
-
+	
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;

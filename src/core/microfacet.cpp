@@ -180,6 +180,7 @@ static Vector3f BeckmannSample(const Vector3f &wi, Float alpha_x, Float alpha_y,
 MicrofacetDistribution::~MicrofacetDistribution() {}
 
 Float BeckmannDistribution::D(const Vector3f &wh) const {
+	printf("    BECKMAN\n");
     Float tan2Theta = Tan2Theta(wh);
     if (std::isinf(tan2Theta)) return 0.;
     Float cos4Theta = Cos2Theta(wh) * Cos2Theta(wh);
@@ -189,6 +190,7 @@ Float BeckmannDistribution::D(const Vector3f &wh) const {
 }
 
 Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
+	printf("    TROWBRIDGE\n");
     Float tan2Theta = Tan2Theta(wh);
     if (std::isinf(tan2Theta)) return 0.;
     const Float cos4Theta = Cos2Theta(wh) * Cos2Theta(wh);
@@ -200,6 +202,7 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
 
 //TODO: Rewrite this
 Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
+
 	Float sigmaR = 0.005f;
 	Float h = 1.f / res.x;  // step size
 	Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
@@ -208,43 +211,43 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 	Float footprintRadius = 0.25;
 	Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
-	Vector2f footprintCenter = Vector2f(300 / 2.f, 300 / 2.f);
-	Vector2f footprintMean = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
-
-	int nDirectionSamples = 4;
+	//Vector2f footprintCenter = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
+	Vector2f footprintMean = Vector2f(u, v);
+	//printf("    %d\n", res.x);
+	//int nDirectionSamples = 4;
 	Float sum = 0;
 	float x = u * res.x;
 	float y = v *res.y;
 	// Sum over the relevant Gaussians
 	// TODO: accelerate by calculating relevant bounds
-	// printf("Sampling for (%d, %d): \n", x, y);
-	for (int sample = 0; sample < nDirectionSamples; ++sample) {
+   // printf("Sampling for (%d, %d): \n", x, y);
+	//for (int sample = 0; sample < nDirectionSamples; ++sample) {
 		// Remapping the st space???
-		Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / res.x),
-			(y + rng.UniformFloat()) * (1.f / res.y));
-		st = st * 2.f - Vector2f(1.f, 1.f);
-		// printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
+    Vector2f st = Vector2f(wh.x,wh.y);
+   // st = st * 2.f - Vector2f(1.f, 1.f);
+    // printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
 
-		// Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
-		Vector2f uv = Vector2f(u,v);
-		// printf("    summing values:\n");
-		for (int idx = 0; idx < res.x*res.y; ++idx) {
-			Float contribution = evaluateFlatPNDF(
-				gaussians[idx].c,
-				uv - gaussians[idx].u,
-				st - gaussians[idx].n,
-				invSigmaHSq,
-				invSigmaRSq,
-				footprintMean - gaussians[idx].u,
-				invCovFootprint
-			);
-			sum += contribution;
-		}
+    // Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
+    Vector2f uv = Vector2f(u,v);
+    // printf("    summing values:\n");
+    for (int idx = 0; idx < res.x*res.y; ++idx) {
+    //	printf("    gaussians[%d]:%d %d\n", idx, gaussians[idx].u.x, gaussians[idx].u.y);
+        Float contribution = evaluateFlatPNDF(
+            gaussians[idx].c,
+            uv - gaussians[idx].u,
+            st - gaussians[idx].n,
+            invSigmaHSq,
+            invSigmaRSq,
+            footprintMean - gaussians[idx].u,
+            invCovFootprint
+        );
+        sum += contribution;
+    }
 		// printf("Sample %d finished!\n", sample);
-	}
+//	}
 
 	// TODO: additional scaling factor dependent on footprint?
-	sum /= (Float)nDirectionSamples;
+	//sum /= (Float)nDirectionSamples;
 	
 	return sum;
 }
@@ -470,6 +473,17 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
 		if (flip) wh = -wh;
 	}
 	return wh;
+	//Vector2f uv = Vector2f(u.x, u.y);
+	//float curMinDistance = MaxFloat;
+
+	//for (int idx = 0; idx < res.x*res.y; ++idx) {
+	//	float distance = (gaussians[idx].u - uv).LengthSquared();
+	//	if (distance < curMinDistance) {
+	//		curMinDistance = distance;
+	//		wh = Vector3f(gaussians[idx].n.x, gaussians[idx].n.x, wo.z);
+	//	}
+	//}
+	//return wo;
 }
 
 
