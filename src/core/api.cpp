@@ -70,6 +70,7 @@
 #include "materials/fourier.h"
 #include "materials/glass.h"
 #include "materials/hair.h"
+#include "materials/snow.h"
 #include "materials/kdsubsurface.h"
 #include "materials/matte.h"
 #include "materials/metal.h"
@@ -419,6 +420,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         material = CreateTranslucentMaterial(mp);
     else if (name == "glass")
         material = CreateGlassMaterial(mp);
+	else if (name == "snow")
+		material = CreateSnowMaterial(mp);
     else if (name == "mirror")
         material = CreateMirrorMaterial(mp);
     else if (name == "hair")
