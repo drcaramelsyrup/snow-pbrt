@@ -121,20 +121,20 @@ Vector2f generateUniformRandomNormal() {
     return Vector2f(hemisphereSample.x, hemisphereSample.y);
 }
 
-Vector2f generateSeedNormals() {
-        // // Sample for m*m Gaussian seeds
-    // Float nSamples = m*m;
-    // for (int i = 0; i < nSamples; ++i) {
-    //     // uniform sampling for now. TODO: at least stratified? see sampling.h
-    //     Float x = outputDim.x * rng.UniformFloat();
-    //     Float y = outputDim.y * rng.UniformFloat();
+Vector2f generateSeedNormals(Vector2f dimensions) {
+    // Sample for m*m Gaussian seeds
+    Float nSamples = m*m;
+    for (int i = 0; i < nSamples; ++i) {
+        // uniform sampling for now. TODO: at least stratified? see sampling.h
+        Float x = dimensions.x * rng.UniformFloat();
+        Float y = dimensions.y * rng.UniformFloat();
 
-    //     // TODO: sample from Beckmann distribution or Trowbridge
-    //     gaussians[i].u = Vector2f(x, y);
-    //     gaussians[i].n = generateUniformRandomNormal();
-    //     // when integrating over all samples, we should get one
-    //     gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
-    // }
+        // TODO: sample from Beckmann distribution or Trowbridge
+        gaussians[i].u = Vector2f(x, y);
+        gaussians[i].n = generateUniformRandomNormal();
+        // when integrating over all samples, we should get one
+        gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
+    }
     return Vector2f(0,0);
 }
 
