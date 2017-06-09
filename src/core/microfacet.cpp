@@ -214,16 +214,24 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 	Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
 	Vector2f uv = Vector2f(u, v);
+
+    // printf("dpdu: %f, %f, %f\n", dpdu.x, dpdu.y, dpdu.z);
+
+
+    Vector3f normDpdu = Normalize(dpdu);
+    Vector3f normDpdv = Normalize(dpdv);
     // printf("%f, %f (uv values)\n", u, v);
 	
 	// Sum over the relevant Gaussians
 	// TODO: accelerate by calculating relevant bounds
 
     // Measure relevant contributions to u and v directions
-	Vector2f localWh = Vector2f(Dot(wh, dpdu), Dot(wh, dpdv));
-    printf("wh: %f, %f, %f\n", wh.x, wh.y, wh.z);
+	Vector2f localWh = Vector2f(Dot(wh, normDpdu), Dot(wh, normDpdv));
+    // if (localWh.Length() > 0.975)
+    //     return 0.f;
+    // printf("wh: %f, %f, %f\n", wh.x, wh.y, wh.z);
 
-    printf("localWh: %f, %f\n", localWh.x, localWh.y);
+    // printf("localWh: %f, %f\n", localWh.x, localWh.y);
     // if (localWh.Length() > 0.975) {
     //     return 0.f;
     // }
@@ -270,9 +278,12 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
     sum *= ((Float)footprintSize / res.x);
 
     if (sum <= 0.f)
-        printf("sum: %f ZERO\n", sum);
+        printf("sum: %f ZERO ", sum);
     else
-        printf("sum: %f\n", sum);
+        printf("sum: %f ", sum);
+    if (localWh.Length() > 0.975) 
+        printf("// OFF UNIT DISK\n");
+    else printf("\n");
 
 
 // TODO: additional scaling factor dependent on footprint?
