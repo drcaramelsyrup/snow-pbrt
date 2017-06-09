@@ -277,13 +277,13 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
     }
     sum *= ((Float)footprintSize / res.x);
 
-    if (sum <= 0.f)
-        printf("sum: %f ZERO ", sum);
-    else
-        printf("sum: %f ", sum);
-    if (localWh.Length() > 0.975) 
-        printf("// OFF UNIT DISK\n");
-    else printf("\n");
+    // if (sum <= 0.f)
+    //     printf("sum: %f ZERO ", sum);
+    // else
+    //     printf("sum: %f ", sum);
+    // if (localWh.Length() > 0.975) 
+    //     printf("// OFF UNIT DISK\n");
+    // else printf("\n");
 
 
 // TODO: additional scaling factor dependent on footprint?
@@ -489,7 +489,6 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
 Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
 	const Point2f &u) const {
 
-    // Vector3f wh;
 
     // Float sigmaR = 0.005f;
     // Float h = 1.f / res.x;  // step size
@@ -520,14 +519,18 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
     // int upperX = Clamp(u*res.x + halfFootprint, 0, res.x - 1);
     // int upperY = Clamp(v*res.y + halfFootprint, 0, res.y - 1);
 
+    // Vector3f wh;
     // Vector2f uv = Vector2f(u.x, u.y);
     // Float curMinDistance = MaxFloat;
 
     // for (int idx = 0; idx < res.x*res.y; ++idx) {
     //     Float distance = (gaussians[idx].u - uv).LengthSquared();
     //     if (distance < curMinDistance) {
+    //         Vector2f gaussianNormal = gaussians[idx].n;
+
     //         curMinDistance = distance;
-    //         wh = Vector3f(gaussians[idx].n.x, gaussians[idx].n.y, wo.z);
+    //         wh = Vector3f(n) + gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
+    //         // wh = Vector3f(gaussians[idx].n.x, gaussians[idx].n.y, wo.z);
     //         // if (wo.z < 0)
     //         //     wh.z = -wo.z;
     //     }
