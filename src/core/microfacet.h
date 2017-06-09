@@ -140,9 +140,10 @@ class FlatGaussianElementsDistribution : public MicrofacetDistribution {
      public:
          // FlatGaussianElementsDistribution Public Methods
          static inline Float RoughnessToAlpha(Float roughness);
-         FlatGaussianElementsDistribution(Float alphax, Float alphay, Float u, Float v, FlatGaussianElement* gaussians, Point2i res,
+         FlatGaussianElementsDistribution(Float alphax, Float alphay, Float u, Float v, Vector3f dpdu, Vector3f dpdv, FlatGaussianElement* gaussians, Point2i res,
                                      bool samplevis = true)
-			 : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {
+			 : MicrofacetDistribution(samplevis), 
+         dpdu(dpdu), dpdv(dpdv), alphax(alphax), alphay(alphay) {
 			 this->u = u;
 			 this->v = v;
 			 this->gaussians = gaussians;
@@ -169,6 +170,8 @@ class FlatGaussianElementsDistribution : public MicrofacetDistribution {
 		 FlatGaussianElement* gaussians;
 		 Float u;
 		 Float v;
+     Vector3f dpdu;
+     Vector3f dpdv;
 		 Point2i res;
 };
 

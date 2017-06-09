@@ -81,7 +81,8 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
                        : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
-                             urough, vrough, si->uv[0], si->uv[1], gaussians, normalRes);
+                             urough, vrough, si->uv[0], si->uv[1], si->dpdu, si->dpdv, 
+                             gaussians, normalRes);
         if (!R.IsBlack()) {
             Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
             if (isSpecular)
