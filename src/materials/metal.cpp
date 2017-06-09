@@ -103,7 +103,6 @@ FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
   
 
   Point2i res(1000,1000);
-  normalRes = res;
   std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
   normalRes = res;
   if (!normalMapImage) {

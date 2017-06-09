@@ -505,8 +505,6 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
     int upperX = Clamp(u.x*res.x + searchRadius, 0, res.x - 1);
     int upperY = Clamp(u.y*res.y + searchRadius, 0, res.y - 1);
 
-    Float sum = 0;
-
     // Base on geographic location
     for (int x = lowerX; x < upperX; ++x) {
         for (int y = lowerY; y < upperY; ++y) {
@@ -516,12 +514,15 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
                 Vector2f gaussianNormal = gaussians[idx].n;
 
                 curMinDistance = distance;
-                wh = Vector3f(n) + gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
+
+                Vector3f normDpdu = Normalize(dpdu);
+                Vector3f normDpdv = Normalize(dpdv);
+                wh = Vector3f(n) + gaussianNormal.x * normDpdu + gaussianNormal.y * normDpdv;
                 if (!SameHemisphere(wo, wh)) wh = -wh;
             }
         }
     }
-    return wh;
+    return Normalize(wh);
 
 
 	// Vector3f wh;
