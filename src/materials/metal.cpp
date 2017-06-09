@@ -38,6 +38,8 @@
 #include "texture.h"
 #include "interaction.h"
 #include "imageio.h"
+#include "rng.h"
+#include "sampling.h"
 
 namespace pbrt {
 
@@ -86,6 +88,13 @@ void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(1., distrib, frMf));
 }
 
+Vector2f MetalMaterial::GenerateUniformRandomNormal() {
+    RNG rng;
+    float u1 = rng.UniformFloat();
+    float u2 = rng.UniformFloat();
+    return Vector2f(UniformSampleDisk(Point2f(u1, u2)));
+}
+
 FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
 {
   const char *inFilename = "normals.png";
@@ -93,18 +102,18 @@ FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
   Float sigmaR = 0.005f;
   
 
-  Point2i res;
+  Point2i res(1000,1000);
+  normalRes = res;
   std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
   normalRes = res;
   if (!normalMapImage) {
     fprintf(stderr, "%s: unable to read image\n", inFilename);
     return nullptr;
   }
-  Point2i outputDim(res);
 
   // u v normal map
   // 4D Gaussians, Gaussians on each dimension
-  int m = outputDim.x; // number of Gaussians per dimension, determined by texile size
+  int m = res.x; // number of Gaussians per dimension, determined by texile size
   FlatGaussianElement* gaussians = new FlatGaussianElement[m*m];  // square distribution
   Float h = 1.f / m;  // step size
   Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
@@ -116,8 +125,9 @@ FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
   for (int y = 0; y < res.y; ++y) {
     for (int x = 0; x < res.x; ++x) {
       int idx = y*res.x + x;
-      gaussians[idx].u = Vector2f(x * (1.f / outputDim.x), y * (1.f / outputDim.y));
+      gaussians[idx].u = Vector2f(x * (1.f / res.x), y * (1.f / res.y));
       gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
+      // gaussians[idx].n = GenerateUniformRandomNormal();
     //  printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
 
       // when integrating over all samples, we should get one

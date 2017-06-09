@@ -69,6 +69,7 @@ class MetalMaterial : public Material {
     FlatGaussianElement* gaussians;
     Point2i normalRes;
     FlatGaussianElement*  ComputeGaussianMixture();
+    Vector2f GenerateUniformRandomNormal();
     Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y);
     bool remapRoughness;
 };

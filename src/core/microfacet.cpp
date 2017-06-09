@@ -197,7 +197,7 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
     Float e =
         (Cos2Phi(wh) / (alphax * alphax) + Sin2Phi(wh) / (alphay * alphay)) *
         tan2Theta;
-    printf("D: %f\n", 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e)));
+    // printf("D: %f\n", 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e)));
     return 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e));
 }
 
@@ -209,15 +209,13 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 	Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
 	Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
 
-    int footprintSize = res.x / 8.f;
+    // int footprintSize = res.x / 8.f;
+    int footprintSize = 12;
 
 	Float footprintRadius = 0.5 * footprintSize;
 	Float footprintVar = 0.005 * footprintRadius;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
 	Vector2f uv = Vector2f(u, v);
-
-    // printf("dpdu: %f, %f, %f\n", dpdu.x, dpdu.y, dpdu.z);
-
 
     Vector3f normDpdu = Normalize(dpdu);
     Vector3f normDpdv = Normalize(dpdv);
@@ -228,14 +226,8 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 
     // Measure relevant contributions to u and v directions
 	Vector2f localWh = Vector2f(Dot(wh, normDpdu), Dot(wh, normDpdv));
-    // if (localWh.Length() > 0.975)
-    //     return 0.f;
     // printf("wh: %f, %f, %f\n", wh.x, wh.y, wh.z);
 
-    // printf("localWh: %f, %f\n", localWh.x, localWh.y);
-    // if (localWh.Length() > 0.975) {
-    //     return 0.f;
-    // }
 	// printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
 
 	// printf("    summing values:\n");
@@ -258,6 +250,7 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
     //     );
     //     sum += contribution;
     // }
+    // Base on geographic location
     for (int x = lowerX; x < upperX; ++x) {
         for (int y = lowerY; y < upperY; ++y) {
             // printf("Sampling for (%d, %d): \n", x, y);
@@ -503,78 +496,61 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
     // Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
     // Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
 
-    // int footprintSize = res.x / 8.f;
+    Vector3f wh;
+    Float curMinDistance = MaxFloat;
 
-    // Float footprintRadius = 0.5 * footprintSize;
-    // Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
-    // Float invCovFootprint = 1.f / (footprintVar * footprintVar);
-    // Vector2f uv = Vector2f(u, v);
-    // // printf("%f, %f (uv values)\n", u, v);
-    
-    // // Sum over the relevant Gaussians
-    // // TODO: accelerate by calculating relevant bounds
-    // Vector2f localWh = Vector2f(wh.x, wh.y);
-    // // if (localWh.Length() > 0.975) {
-    // //     return 0.f;
-    // // }
-    // // printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
+    Float searchRadius = 12.f;
+    int lowerX = Clamp(u.x*res.x - searchRadius, 0, res.x - 1);
+    int lowerY = Clamp(u.y*res.y - searchRadius, 0, res.y - 1);
+    int upperX = Clamp(u.x*res.x + searchRadius, 0, res.x - 1);
+    int upperY = Clamp(u.y*res.y + searchRadius, 0, res.y - 1);
 
-    // // printf("    summing values:\n");
-    // int halfFootprint = footprintSize * 0.5;
-    // int lowerX = Clamp(u*res.x - halfFootprint, 0, res.x - 1);
-    // int lowerY = Clamp(v*res.y - halfFootprint, 0, res.y - 1);
-    // int upperX = Clamp(u*res.x + halfFootprint, 0, res.x - 1);
-    // int upperY = Clamp(v*res.y + halfFootprint, 0, res.y - 1);
+    Float sum = 0;
 
-    // Vector3f wh;
-    // Vector2f uv = Vector2f(u.x, u.y);
-    // Float curMinDistance = MaxFloat;
+    // Base on geographic location
+    for (int x = lowerX; x < upperX; ++x) {
+        for (int y = lowerY; y < upperY; ++y) {
+            int idx = y*res.x + x;
+            Float distance = (gaussians[idx].u - Vector2f(u)).LengthSquared();
+            if (distance < curMinDistance) {
+                Vector2f gaussianNormal = gaussians[idx].n;
 
-    // for (int idx = 0; idx < res.x*res.y; ++idx) {
-    //     Float distance = (gaussians[idx].u - uv).LengthSquared();
-    //     if (distance < curMinDistance) {
-    //         Vector2f gaussianNormal = gaussians[idx].n;
-
-    //         curMinDistance = distance;
-    //         wh = Vector3f(n); //+ gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
-    //         // wh = Vector3f(gaussians[idx].n.x, gaussians[idx].n.y, wo.z);
-    //         // if (wo.z < 0)
-    //         //     wh.z = -wo.z;
-    //     }
-    // }
-    // return wh;
+                curMinDistance = distance;
+                wh = Vector3f(n) + gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
+                if (!SameHemisphere(wo, wh)) wh = -wh;
+            }
+        }
+    }
+    return wh;
 
 
-	Vector3f wh;
-	if (!sampleVisibleArea) {
-		Float cosTheta = 0, phi = (2 * Pi) * u[1];
-		if (alphax == alphay) {
-			Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
-			cosTheta = 1 / std::sqrt(1 + tanTheta2);
-		}
-		else {
-			phi =
-				std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
-			if (u[1] > .5f) phi += Pi;
-			Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
-			const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
-			const Float alpha2 =
-				1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
-			Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
-			cosTheta = 1 / std::sqrt(1 + tanTheta2);
-		}
-		Float sinTheta =
-			std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
-		wh = SphericalDirection(sinTheta, cosTheta, phi);
-		if (!SameHemisphere(wo, wh)) wh = -wh;
-	}
-	else {
-		bool flip = wo.z < 0;
-		wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
-		if (flip) wh = -wh;
-	}
-    // printf("(%f, %f): uv\n", u.x, u.y);
-	return wh;
+	// Vector3f wh;
+ //    if (!sampleVisibleArea) {
+ //        Float cosTheta = 0, phi = (2 * Pi) * u[1];
+ //        if (alphax == alphay) {
+ //            Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
+ //            cosTheta = 1 / std::sqrt(1 + tanTheta2);
+ //        } else {
+ //            phi =
+ //                std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
+ //            if (u[1] > .5f) phi += Pi;
+ //            Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
+ //            const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
+ //            const Float alpha2 =
+ //                1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
+ //            Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
+ //            cosTheta = 1 / std::sqrt(1 + tanTheta2);
+ //        }
+ //        Float sinTheta =
+ //            std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
+ //        wh = SphericalDirection(sinTheta, cosTheta, phi);
+ //        if (!SameHemisphere(wo, wh)) wh = -wh;
+ //    } else {
+ //        bool flip = wo.z < 0;
+ //        wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
+ //        if (flip) wh = -wh;
+ //    }
+ //    return wh;
 }
 
 
