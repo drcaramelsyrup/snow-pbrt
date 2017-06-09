@@ -38,8 +38,8 @@
 #include "texture.h"
 #include "interaction.h"
 #include "imageio.h"
-#include "rng.h"
 #include "sampling.h"
+
 
 namespace pbrt {
 
@@ -89,10 +89,10 @@ void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 }
 
 Vector2f MetalMaterial::GenerateUniformRandomNormal() {
-    RNG rng;
-    float u1 = rng.UniformFloat();
-    float u2 = rng.UniformFloat();
-    return Vector2f(UniformSampleDisk(Point2f(u1, u2)));
+    
+    float u1 = metalRng.UniformFloat() * 2.f - 1.f;
+    float u2 = metalRng.UniformFloat() * 2.f - 1.f;
+    return Vector2f(u1, u2);
 }
 
 FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
@@ -100,7 +100,6 @@ FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
   const char *inFilename = "normals.png";
 
   Float sigmaR = 0.005f;
-  
 
   Point2i res(1000,1000);
   std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
@@ -127,7 +126,8 @@ FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
       gaussians[idx].u = Vector2f(x * (1.f / res.x), y * (1.f / res.y));
       gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
       // gaussians[idx].n = GenerateUniformRandomNormal();
-    //  printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
+
+     // printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
 
       // when integrating over all samples, we should get one
       gaussians[idx].c = h*h / ((4 * Pi*Pi) * (sigmaH*sigmaH) * (sigmaR*sigmaR));

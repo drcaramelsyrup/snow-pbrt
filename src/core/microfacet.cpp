@@ -209,8 +209,7 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 	Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
 	Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
 
-    // int footprintSize = res.x / 8.f;
-    int footprintSize = 12;
+    int footprintSize = res.x / 32.f;
 
 	Float footprintRadius = 0.5 * footprintSize;
 	Float footprintVar = 0.005 * footprintRadius;    // distance between centers of footprints
@@ -273,7 +272,7 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
             //     gaussians[idx].n.x, gaussians[idx].n.y, localWh.x, localWh.y);
         }
     }
-    // sum *= ((Float)footprintSize / res.x);
+    sum *= ((Float)res.x / footprintSize);
     // printf("uv: (%f, %f), c, u, n,")
 
 
@@ -514,9 +513,9 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
                 Vector2f gaussianNormal = gaussians[idx].n;
 
                 curMinDistance = distance;
-
                 Vector3f normDpdu = Normalize(dpdu);
                 Vector3f normDpdv = Normalize(dpdv);
+
                 wh = Vector3f(n) + gaussianNormal.x * normDpdu + gaussianNormal.y * normDpdv;
                 if (!SameHemisphere(wo, wh)) wh = -wh;
             }

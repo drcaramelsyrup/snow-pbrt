@@ -43,6 +43,7 @@
 #include "material.h"
 #include "spectrum.h"
 #include "reflection.h"
+#include "rng.h"
 
 namespace pbrt {
 
@@ -62,6 +63,7 @@ class MetalMaterial : public Material {
                                     bool allowMultipleLobes) const;
 
   private:
+    RNG metalRng;
     // MetalMaterial Private Data
     std::shared_ptr<Texture<Spectrum>> eta, k;
     std::shared_ptr<Texture<Float>> roughness, uRoughness, vRoughness;
