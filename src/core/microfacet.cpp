@@ -266,7 +266,7 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 
 
 // TODO: additional scaling factor dependent on footprint?
-    sum = Clamp(sum, 0.f, 1.f);
+    sum = Clamp(sum, 1e-35f, 1.f);
 	
 	// printf("Sample %d finished!\n", sample);
 

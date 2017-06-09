@@ -103,8 +103,8 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
     Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
     Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
-    si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
-                                                     sig_a, sig_s, table);
+    // si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
+                                                     // sig_a, sig_s, table);
 }
 
 FlatGaussianElement* SnowMaterial::ComputeGaussianMixture()
