@@ -197,6 +197,7 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
     Float e =
         (Cos2Phi(wh) / (alphax * alphax) + Sin2Phi(wh) / (alphay * alphay)) *
         tan2Theta;
+    printf("D: %f\n", 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e)));
     return 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e));
 }
 
@@ -211,7 +212,7 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
     int footprintSize = res.x / 8.f;
 
 	Float footprintRadius = 0.5 * footprintSize;
-	Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
+	Float footprintVar = 0.005 * footprintRadius;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
 	Vector2f uv = Vector2f(u, v);
 
@@ -273,9 +274,15 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
                 invCovFootprint
             );
             sum += contribution;
+
+            // printf("uv: (%f, %f), c: %f, u: (%f, %f), n: (%f, %f), localWh: (%f, %f)\n",
+            //     uv.x, uv.y, gaussians[idx].c, gaussians[idx].u.x, gaussians[idx].u.y,
+            //     gaussians[idx].n.x, gaussians[idx].n.y, localWh.x, localWh.y);
         }
     }
-    sum *= ((Float)footprintSize / res.x);
+    // sum *= ((Float)footprintSize / res.x);
+    // printf("uv: (%f, %f), c, u, n,")
+
 
     // if (sum <= 0.f)
     //     printf("sum: %f ZERO ", sum);
@@ -529,7 +536,7 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
     //         Vector2f gaussianNormal = gaussians[idx].n;
 
     //         curMinDistance = distance;
-    //         wh = Vector3f(n) + gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
+    //         wh = Vector3f(n); //+ gaussianNormal.x * dpdu + gaussianNormal.y * dpdv;
     //         // wh = Vector3f(gaussians[idx].n.x, gaussians[idx].n.y, wo.z);
     //         // if (wo.z < 0)
     //         //     wh.z = -wo.z;

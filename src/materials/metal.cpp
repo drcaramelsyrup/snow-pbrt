@@ -37,6 +37,7 @@
 #include "paramset.h"
 #include "texture.h"
 #include "interaction.h"
+#include "imageio.h"
 
 namespace pbrt {
 
@@ -54,7 +55,9 @@ MetalMaterial::MetalMaterial(const std::shared_ptr<Texture<Spectrum>> &eta,
       uRoughness(uRoughness),
       vRoughness(vRoughness),
       bumpMap(bumpMap),
-      remapRoughness(remapRoughness) {}
+      remapRoughness(remapRoughness) {
+        gaussians = ComputeGaussianMixture();
+      }
 
 void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                MemoryArena &arena,
@@ -74,9 +77,66 @@ void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
     Fresnel *frMf = ARENA_ALLOC(arena, FresnelConductor)(1., eta->Evaluate(*si),
                                                          k->Evaluate(*si));
+    // MicrofacetDistribution *distrib =
+    //     ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(uRough, vRough);
     MicrofacetDistribution *distrib =
-        ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(uRough, vRough);
+    ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(uRough, vRough,
+      si->uv[0], si->uv[1], si->dpdu, si->dpdv, si->shading.n, gaussians, normalRes);
+
     si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(1., distrib, frMf));
+}
+
+FlatGaussianElement* MetalMaterial::ComputeGaussianMixture()
+{
+  const char *inFilename = "normals.png";
+
+  Float sigmaR = 0.005f;
+  
+
+  Point2i res;
+  std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
+  normalRes = res;
+  if (!normalMapImage) {
+    fprintf(stderr, "%s: unable to read image\n", inFilename);
+    return nullptr;
+  }
+  Point2i outputDim(res);
+
+  // u v normal map
+  // 4D Gaussians, Gaussians on each dimension
+  int m = outputDim.x; // number of Gaussians per dimension, determined by texile size
+  FlatGaussianElement* gaussians = new FlatGaussianElement[m*m];  // square distribution
+  Float h = 1.f / m;  // step size
+  Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
+  Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
+  Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
+
+  // Sample for m*m normal map
+
+  for (int y = 0; y < res.y; ++y) {
+    for (int x = 0; x < res.x; ++x) {
+      int idx = y*res.x + x;
+      gaussians[idx].u = Vector2f(x * (1.f / outputDim.x), y * (1.f / outputDim.y));
+      gaussians[idx].n = sampleNormalFromNormalMap(normalMapImage.get(), res.x, x, y);
+    //  printf("at (%d, %d), normal: (%f, %f)\n", x, y, gaussians[idx].n.x, gaussians[idx].n.y);
+
+      // when integrating over all samples, we should get one
+      gaussians[idx].c = h*h / ((4 * Pi*Pi) * (sigmaH*sigmaH) * (sigmaR*sigmaR));
+    }
+  }
+  return gaussians;
+
+}
+
+Vector2f MetalMaterial::sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y) {
+  // bilinear interpolation
+  // Assuming square size
+  x = Clamp(x, 0, size - 1);
+  y = Clamp(y, 0, size - 1);
+  RGBSpectrum rgb = normalMap[y*size + x];
+  Float colors[3];
+  rgb.ToRGB(colors);
+  return Vector2f(colors[0] /* r */, colors[1] /* g */) * 2.f - Vector2f(1.f, 1.f);
 }
 
 const int CopperSamples = 56;
