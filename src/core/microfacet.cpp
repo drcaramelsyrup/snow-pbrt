@@ -69,6 +69,8 @@ Float FlatGaussianElementsDistribution::evaluateFlatPNDF(Float c, Vector2f u, Ve
 	Float finalCov = getFlatGaussianProductCov(invSigmaHSq, invFootprintCov);
 	Vector2f finalMu = getFlatGaussianProductMean(finalCov, invSigmaHSq, invFootprintCov, u0, footprintMean);
 	Float finalC = getFlatGaussianProductScalingCoeff(finalMu, c1, c2, u0, footprintMean, invSigmaHSq, invFootprintCov);
+    if (finalC < 0.f)
+        printf("Less than 0 final C\n");
 	// Integration over combined, final Gaussian
 	return finalC * 2 * Pi * finalCov; // sqrt(norm of final cov matrix)
 }
@@ -205,46 +207,50 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 	Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
 	Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
 	Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
-	Float footprintRadius = 0.25;
-	Float footprintVar = 0.5 * footprintRadius;    // distance between centers of footprints
+
+    int footprintSize = res.x / 32.f;
+
+	Float footprintVar = 0.0025 * footprintSize;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
-	Vector2f footprintCenter = Vector2f(300 / 2.f, 300 / 2.f);
-	Vector2f footprintMean = Vector2f(footprintCenter.x / res.x, footprintCenter.y / res.y);
+	Vector2f uv = Vector2f(u, v);
 
-	int nDirectionSamples = 4;
-	Float sum = 0;
-	float x = u * res.x;
-	float y = v *res.y;
+    Vector3f normDpdu = Normalize(dpdu);
+    Vector3f normDpdv = Normalize(dpdv);
+	
 	// Sum over the relevant Gaussians
-	// TODO: accelerate by calculating relevant bounds
-	// printf("Sampling for (%d, %d): \n", x, y);
-	for (int sample = 0; sample < nDirectionSamples; ++sample) {
-		// Remapping the st space???
-		Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / res.x),
-			(y + rng.UniformFloat()) * (1.f / res.y));
-		st = st * 2.f - Vector2f(1.f, 1.f);
-		// printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
+	// accelerate by calculating relevant bounds
 
-		// Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
-		Vector2f uv = Vector2f(u,v);
-		// printf("    summing values:\n");
-		for (int idx = 0; idx < res.x*res.y; ++idx) {
-			Float contribution = evaluateFlatPNDF(
-				gaussians[idx].c,
-				uv - gaussians[idx].u,
-				st - gaussians[idx].n,
-				invSigmaHSq,
-				invSigmaRSq,
-				footprintMean - gaussians[idx].u,
-				invCovFootprint
-			);
-			sum += contribution;
-		}
-		// printf("Sample %d finished!\n", sample);
-	}
+    // Measure relevant contributions to u and v directions
+	Vector2f localWh = Vector2f(Dot(wh, normDpdu), Dot(wh, normDpdv));
 
-	// TODO: additional scaling factor dependent on footprint?
-	sum /= (Float)nDirectionSamples;
+    int halfFootprint = footprintSize * 0.5;
+    int lowerX = Clamp(u*res.x - halfFootprint, 0, res.x - 1);
+    int lowerY = Clamp(v*res.y - halfFootprint, 0, res.y - 1);
+    int upperX = Clamp(u*res.x + halfFootprint, 0, res.x - 1);
+    int upperY = Clamp(v*res.y + halfFootprint, 0, res.y - 1);
+
+    Float sum = 0;
+    // Base on geographic location
+    for (int x = lowerX; x < upperX; ++x) {
+        for (int y = lowerY; y < upperY; ++y) {
+
+            int idx = y*res.x + x;
+            Float contribution = evaluateFlatPNDF(
+                gaussians[idx].c,
+                uv - gaussians[idx].u,
+                localWh - gaussians[idx].n,
+                invSigmaHSq,
+                invSigmaRSq,
+                uv - gaussians[idx].u /* footprint mean */,
+                invCovFootprint
+            );
+            sum += contribution;
+
+        }
+    }
+    sum *= ((Float)res.x / footprintSize) * 0.5;
+    // TODO: additional scaling factor dependent on footprint?
+    // sum = Clamp(sum, 1e-35f, 1.f);
 	
 	return sum;
 }
@@ -441,38 +447,35 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
 //TODO: Rewrite this
 Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
 	const Point2f &u) const {
-	Vector3f wh;
-	if (!sampleVisibleArea) {
-		Float cosTheta = 0, phi = (2 * Pi) * u[1];
-		if (alphax == alphay) {
-			Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
-			cosTheta = 1 / std::sqrt(1 + tanTheta2);
-		}
-		else {
-			phi =
-				std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
-			if (u[1] > .5f) phi += Pi;
-			Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
-			const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
-			const Float alpha2 =
-				1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
-			Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
-			cosTheta = 1 / std::sqrt(1 + tanTheta2);
-		}
-		Float sinTheta =
-			std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
-		wh = SphericalDirection(sinTheta, cosTheta, phi);
-		if (!SameHemisphere(wo, wh)) wh = -wh;
-	}
-	else {
-		bool flip = wo.z < 0;
-		wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
-		if (flip) wh = -wh;
-	}
-	return wh;
+    Vector3f wh;
+    Float curMinDistance = MaxFloat;
+
+    Float searchRadius = 12.f;
+    int lowerX = Clamp(u.x*res.x - searchRadius, 0, res.x - 1);
+    int lowerY = Clamp(u.y*res.y - searchRadius, 0, res.y - 1);
+    int upperX = Clamp(u.x*res.x + searchRadius, 0, res.x - 1);
+    int upperY = Clamp(u.y*res.y + searchRadius, 0, res.y - 1);
+
+    // Base on geographic location
+    for (int x = lowerX; x < upperX; ++x) {
+        for (int y = lowerY; y < upperY; ++y) {
+            int idx = y*res.x + x;
+            Float distance = (gaussians[idx].u - Vector2f(u)).LengthSquared();
+            if (distance < curMinDistance) {
+                Vector2f gaussianNormal = gaussians[idx].n;
+
+                curMinDistance = distance;
+                Vector3f normDpdu = Normalize(dpdu);
+                Vector3f normDpdv = Normalize(dpdv);
+
+                wh = Vector3f(n) + gaussianNormal.x * normDpdu + gaussianNormal.y * normDpdv;
+                if (!SameHemisphere(wo, wh)) wh = -wh;
+            }
+        }
+    }
+    return Normalize(wh);
+
 }
-
-
 
 Float MicrofacetDistribution::Pdf(const Vector3f &wo,
                                   const Vector3f &wh) const {
@@ -481,12 +484,5 @@ Float MicrofacetDistribution::Pdf(const Vector3f &wo,
     else
         return D(wh) * AbsCosTheta(wh);
 }
-
-
-
-// FlatGaussianElementsDistribution::FlatGaussianElementsDistribution(Float alphax, Float alphay,
-//                                     bool samplevis = true)
-//     : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {
-// }
 
 }  // namespace pbrt

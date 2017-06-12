@@ -64,7 +64,6 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
-    isSpecular = false;
     if (isSpecular && allowMultipleLobes) {
         si->bsdf->Add(
             ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
@@ -73,15 +72,16 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
-        // MicrofacetDistribution *distrib =
-        //     isSpecular ? nullptr
-        //                : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
-        //                      urough, vrough, si->uv[0], si->uv[1], gaussians, normalRes);
+        MicrofacetDistribution *trDistrib =
+            isSpecular ? nullptr
+                       : ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(
+                             urough, vrough);
 
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
                        : ARENA_ALLOC(arena, FlatGaussianElementsDistribution)(
-                             urough, vrough, si->uv[0], si->uv[1], gaussians, normalRes);
+                             urough, vrough, si->uv[0], si->uv[1], si->dpdu, si->dpdv, si->shading.n, 
+                             gaussians, normalRes);
         if (!R.IsBlack()) {
             Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
             if (isSpecular)
@@ -97,7 +97,7 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                     T, 1.f, eta, mode));
             else
                 si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(
-                    T, distrib, 1.f, eta, mode));
+                    T, trDistrib, 1.f, eta, mode));
         }
     }
 
@@ -109,10 +109,10 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
 FlatGaussianElement* SnowMaterial::ComputeGaussianMixture()
 {
-	const char *inFilename = "normals.png";
+	// const char *inFilename = "normals.png";
+    const char *inFilename = "smallflakes.png";
 
 	Float sigmaR = 0.005f;
-	
 
 	Point2i res;
 	std::unique_ptr<RGBSpectrum[]> normalMapImage(ReadImage(inFilename, &res));
@@ -171,17 +171,7 @@ SnowMaterial *CreateSnowMaterial(const TextureParams &mp) {
 
     Float g = mp.FindFloat("g", -0.93f);
 
-    /*std::string name = "Lowfat Milk";
-    bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
-    if (!found)
-        Warning("Named material \"%s\" not found.  Using defaults.",
-                name.c_str());
-    else
-        g = 0; /* Enforce g=0 (the database specifies reduced scattering
-                  coefficients) */
-
     printf("Spectrum %f\n", sig_a[0]);
-
 
     Float scale = mp.FindFloat("scale", 1.f);
     Float eta = mp.FindFloat("eta", 1.33f);

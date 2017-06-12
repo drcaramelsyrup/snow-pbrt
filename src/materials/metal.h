@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 #include "spectrum.h"
+#include "reflection.h"
+#include "rng.h"
 
 namespace pbrt {
 
@@ -61,15 +63,20 @@ class MetalMaterial : public Material {
                                     bool allowMultipleLobes) const;
 
   private:
+    RNG metalRng;
     // MetalMaterial Private Data
     std::shared_ptr<Texture<Spectrum>> eta, k;
     std::shared_ptr<Texture<Float>> roughness, uRoughness, vRoughness;
     std::shared_ptr<Texture<Float>> bumpMap;
+    FlatGaussianElement* gaussians;
+    Point2i normalRes;
+    FlatGaussianElement*  ComputeGaussianMixture();
+    Vector2f GenerateUniformRandomNormal();
+    Vector2f sampleNormalFromNormalMap(const RGBSpectrum* normalMap, int size, int x, int y);
     bool remapRoughness;
 };
 
 MetalMaterial *CreateMetalMaterial(const TextureParams &mp);
-
 }  // namespace pbrt
 
 #endif  // PBRT_MATERIALS_METAL_H

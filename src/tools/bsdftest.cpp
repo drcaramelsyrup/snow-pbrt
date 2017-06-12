@@ -121,30 +121,12 @@ Vector2f generateUniformRandomNormal() {
     return Vector2f(hemisphereSample.x, hemisphereSample.y);
 }
 
-Vector2f generateSeedNormals(Vector2f dimensions) {
-    // Sample for m*m Gaussian seeds
-    // Float nSamples = m*m;
-    // for (int i = 0; i < nSamples; ++i) {
-    //     // uniform sampling for now. TODO: at least stratified? see sampling.h
-    //     Float x = dimensions.x * rng.UniformFloat();
-    //     Float y = dimensions.y * rng.UniformFloat();
-
-    //     // TODO: sample from Beckmann distribution or Trowbridge
-    //     gaussians[i].u = Vector2f(x, y);
-    //     gaussians[i].n = generateUniformRandomNormal();
-    //     // when integrating over all samples, we should get one
-    //     gaussians[i].c = h*h * (1.f / 2*Pi) * invSigmaHSq * invSigmaRSq;
-    // }
-    return Vector2f(0,0);
-}
-
 struct FlatGaussianElement {
     Vector2f u;
     Vector2f n;
 
     Float c;
 
-    // Float invCov[4][4];
 };
 
 Float getFlatGaussian2DConstant(Float c, Vector2f s, Float invSigmaRSq) {
@@ -255,13 +237,6 @@ int create4DPNDF(int argc, char* argv[]) {
     Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
     Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
 
-    // Float invCov[4][4];
-    // invCov[0][0] = 
-    // Matrix4x4 invCov(invSigmaHSq, Float t01, Float t02, Float t03, 
-    //                  Float t10, invSigmaHSq, Float t12, Float t13, 
-    //                  Float t20, Float t21, invSigmaRSq, Float t23, 
-    //                  Float t30, Float t31, Float t32, invSigmaRSq);
-
     // Sample for m*m normal map
 
     for (int y = 0; y < res.y; ++y) {
@@ -297,15 +272,13 @@ int create4DPNDF(int argc, char* argv[]) {
             // TODO: accelerate by calculating relevant bounds
             // printf("Sampling for (%d, %d): \n", x, y);
             for (int sample = 0; sample < nDirectionSamples; ++sample) {
-                // Remapping the st space???
+                // Remapping the st space? sample one footprint, around whole unit disk
                 Vector2f st = Vector2f((x + rng.UniformFloat()) * (1.f / outputDim.x), 
                     (y + rng.UniformFloat()) * (1.f / outputDim.y));
+                // Unit disk
                 st = st * 2.f - Vector2f(1.f, 1.f);
-                // printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
 
-                // Vector2f st = Vector2f(rng.UniformFloat(), rng.UniformFloat());
                 Vector2f uv = Vector2f(((Float)(x)) / outputDim.x, ((Float)(y)) / outputDim.y);
-                // printf("    summing values:\n");
                 for (int idx = 0; idx < m*m; ++idx) {
                     Float contribution = evaluateFlatPNDF(
                         gaussians[idx].c, 
@@ -322,7 +295,6 @@ int create4DPNDF(int argc, char* argv[]) {
                         maxUV = uv;
                     }
                 }
-                // printf("Sample %d finished!\n", sample);
             }
 
             // TODO: additional scaling factor dependent on footprint?
