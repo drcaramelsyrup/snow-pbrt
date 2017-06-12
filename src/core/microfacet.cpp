@@ -197,7 +197,6 @@ Float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
     Float e =
         (Cos2Phi(wh) / (alphax * alphax) + Sin2Phi(wh) / (alphay * alphay)) *
         tan2Theta;
-    // printf("D: %f\n", 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e)));
     return 1 / (Pi * alphax * alphay * cos4Theta * (1 + e) * (1 + e));
 }
 
@@ -211,25 +210,19 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
 
     int footprintSize = res.x / 32.f;
 
-	Float footprintRadius = 0.5 * footprintSize;
-	Float footprintVar = 0.005 * footprintRadius;    // distance between centers of footprints
+	Float footprintVar = 0.0025 * footprintSize;    // distance between centers of footprints
 	Float invCovFootprint = 1.f / (footprintVar * footprintVar);
 	Vector2f uv = Vector2f(u, v);
 
     Vector3f normDpdu = Normalize(dpdu);
     Vector3f normDpdv = Normalize(dpdv);
-    // printf("%f, %f (uv values)\n", u, v);
 	
 	// Sum over the relevant Gaussians
-	// TODO: accelerate by calculating relevant bounds
+	// accelerate by calculating relevant bounds
 
     // Measure relevant contributions to u and v directions
 	Vector2f localWh = Vector2f(Dot(wh, normDpdu), Dot(wh, normDpdv));
-    // printf("wh: %f, %f, %f\n", wh.x, wh.y, wh.z);
 
-	// printf("at (%d, %d), normal: (%f, %f)\n", x, y, st.x, st.y);
-
-	// printf("    summing values:\n");
     int halfFootprint = footprintSize * 0.5;
     int lowerX = Clamp(u*res.x - halfFootprint, 0, res.x - 1);
     int lowerY = Clamp(v*res.y - halfFootprint, 0, res.y - 1);
@@ -237,23 +230,9 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
     int upperY = Clamp(v*res.y + halfFootprint, 0, res.y - 1);
 
     Float sum = 0;
-    // for (int idx = 0; idx < res.x*res.y; ++idx) {
-    //     Float contribution = evaluateFlatPNDF(
-    //         gaussians[idx].c,
-    //         uv - gaussians[idx].u,
-    //         localWh - gaussians[idx].n,
-    //         invSigmaHSq,
-    //         invSigmaRSq,
-    //         uv - gaussians[idx].u /* footprint mean */,
-    //         invCovFootprint
-    //     );
-    //     sum += contribution;
-    // }
     // Base on geographic location
     for (int x = lowerX; x < upperX; ++x) {
         for (int y = lowerY; y < upperY; ++y) {
-            // printf("Sampling for (%d, %d): \n", x, y);
-            // printf("From (%d, %d) to (%d, %d)\n", lowerX, lowerY, upperX, upperY);
 
             int idx = y*res.x + x;
             Float contribution = evaluateFlatPNDF(
@@ -267,30 +246,11 @@ Float FlatGaussianElementsDistribution::D(const Vector3f &wh) const {
             );
             sum += contribution;
 
-            // printf("uv: (%f, %f), c: %f, u: (%f, %f), n: (%f, %f), localWh: (%f, %f)\n",
-            //     uv.x, uv.y, gaussians[idx].c, gaussians[idx].u.x, gaussians[idx].u.y,
-            //     gaussians[idx].n.x, gaussians[idx].n.y, localWh.x, localWh.y);
         }
     }
-    sum *= ((Float)res.x / footprintSize);
-    // printf("uv: (%f, %f), c, u, n,")
-
-
-    // if (sum <= 0.f)
-    //     printf("sum: %f ZERO ", sum);
-    // else
-    //     printf("sum: %f ", sum);
-    // if (localWh.Length() > 0.975) 
-    //     printf("// OFF UNIT DISK\n");
-    // else printf("\n");
-
-
-// TODO: additional scaling factor dependent on footprint?
+    sum *= ((Float)res.x / footprintSize) * 0.5;
+    // TODO: additional scaling factor dependent on footprint?
     // sum = Clamp(sum, 1e-35f, 1.f);
-	
-	// printf("Sample %d finished!\n", sample);
-
-	
 	
 	return sum;
 }
@@ -487,14 +447,6 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
 //TODO: Rewrite this
 Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
 	const Point2f &u) const {
-
-
-    // Float sigmaR = 0.005f;
-    // Float h = 1.f / res.x;  // step size
-    // Float sigmaH = h / std::sqrt(8.f * std::log(2.f));  // std dev of Gaussian seeds
-    // Float invSigmaHSq = 1.f / (sigmaH * sigmaH);
-    // Float invSigmaRSq = 1.f / (sigmaR * sigmaR);
-
     Vector3f wh;
     Float curMinDistance = MaxFloat;
 
@@ -523,37 +475,7 @@ Vector3f FlatGaussianElementsDistribution::Sample_wh(const Vector3f &wo,
     }
     return Normalize(wh);
 
-
-	// Vector3f wh;
- //    if (!sampleVisibleArea) {
- //        Float cosTheta = 0, phi = (2 * Pi) * u[1];
- //        if (alphax == alphay) {
- //            Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
- //            cosTheta = 1 / std::sqrt(1 + tanTheta2);
- //        } else {
- //            phi =
- //                std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
- //            if (u[1] > .5f) phi += Pi;
- //            Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
- //            const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
- //            const Float alpha2 =
- //                1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
- //            Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
- //            cosTheta = 1 / std::sqrt(1 + tanTheta2);
- //        }
- //        Float sinTheta =
- //            std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
- //        wh = SphericalDirection(sinTheta, cosTheta, phi);
- //        if (!SameHemisphere(wo, wh)) wh = -wh;
- //    } else {
- //        bool flip = wo.z < 0;
- //        wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
- //        if (flip) wh = -wh;
- //    }
- //    return wh;
 }
-
-
 
 Float MicrofacetDistribution::Pdf(const Vector3f &wo,
                                   const Vector3f &wh) const {
@@ -562,12 +484,5 @@ Float MicrofacetDistribution::Pdf(const Vector3f &wo,
     else
         return D(wh) * AbsCosTheta(wh);
 }
-
-
-
-// FlatGaussianElementsDistribution::FlatGaussianElementsDistribution(Float alphax, Float alphay,
-//                                     bool samplevis = true)
-//     : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {
-// }
 
 }  // namespace pbrt

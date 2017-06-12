@@ -109,7 +109,8 @@ void SnowMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
 FlatGaussianElement* SnowMaterial::ComputeGaussianMixture()
 {
-	const char *inFilename = "flakes.tga";
+	// const char *inFilename = "normals.png";
+    const char *inFilename = "smallflakes.png";
 
 	Float sigmaR = 0.005f;
 
